@@ -13,10 +13,11 @@ if (!config.port) {
 }
 
 var server    = webserver.create()
-var listening = server.listen(config.port, onRequest)
+var port = Number(system.env.PORT) || config.port
+var listening = server.listen(port, onRequest)
 
 if (!listening) {
-  console.error("Could not bind to port " + config.port)
+  console.error("Could not bind to port " + port)
   phantom.exit(1)
 }
 
