@@ -217,6 +217,12 @@ var readify = function readify(){
                 }
             };
 
+            setTimeout(function(){
+                var readyEvent = document.createEvent("Event");
+                readyEvent.initEvent("IamReadable", true, true);
+                window.dispatchEvent(readyEvent);
+            }, 1);
+
             return { title: articleTitle.innerText, content: articleContent.innerHTML};
         },
 
