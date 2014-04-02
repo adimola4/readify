@@ -72,6 +72,10 @@ function onRequest(req, res) {
     send(200, JSON.stringify(out))
   }
 
+  page.onConsoleMessage = function(msg) {
+    console.log('page: ' + msg);
+  };
+
   var timeout = setTimeout(page.onCallback, maxTime)
 
   var out;

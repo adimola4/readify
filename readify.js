@@ -1,13 +1,8 @@
 var readify = function readify(){
-    //global params
-    var readConvertLinksToFootnotes = false,
-       readStyle = 'style-newspaper',
-       readSize = 'size-medium',
-       readMargin = 'margin-wide';
 
-    var dbg = (typeof console !== 'undefined') ? function(s) {
+    var dbg = function(s) {
         console.log("Readability: " + s);
-    } : function() {};
+    };
 
     /*
      * Readability. An Arc90 Lab Experiment. 
@@ -20,16 +15,6 @@ var readify = function readify(){
      * Readability is licensed under the Apache License, Version 2.0.
     **/
     var readability = {
-        version:                '1.7.1',
-        emailSrc:               'http://lab.arc90.com/experiments/readability/email.php',
-        iframeLoads:             0,
-        convertLinksToFootnotes: false,
-        reversePageScroll:       false, /* If they hold shift and hit space, scroll up */
-        frameHack:               false, /**
-                                          * The frame hack is to workaround a firefox bug where if you
-                                          * pull content out of a frame and stick it into the parent element, the scrollbar won't appear.
-                                          * So we fake a scrollbar in the wrapping div.
-                                         **/
         biggestFrame:            false,
         bodyCache:               null,   /* Cache the body HTML in case we need to re-use it later */
         flags:                   0x1 | 0x2 | 0x4,   /* Start with all flags set. */
@@ -98,17 +83,14 @@ var readify = function readify(){
             /* Build readability's DOM tree */
             var overlay        = document.createElement("DIV");
             var innerDiv       = document.createElement("DIV");
-            var articleTools   = readability.getArticleTools();
             var articleTitle   = readability.getArticleTitle();
             var articleContent = readability.grabArticle();
-            var articleFooter  = readability.getArticleFooter();
 
             if(!articleContent) {
                 articleContent    = document.createElement("DIV");
                 articleContent.id = "readability-content";
                 articleContent.innerHTML = [
                     "<p>Sorry, readability was unable to parse this page for content. If you feel like it should have been able to, please <a href='http://code.google.com/p/arc90labs-readability/issues/entry'>let us know by submitting an issue.</a></p>",
-                    (readability.frameHack ? "<p><strong>It appears this page uses frames.</strong> Unfortunately, browser security properties often cause Readability to fail on pages that include frames. You may want to try running readability itself on this source page: <a href='" + readability.biggestFrame.src + "'>" + readability.biggestFrame.src + "</a></p>" : ""),
                     "<p>Also, please note that Readability does not play very nicely with front pages. Readability is intended to work on articles with a sizable chunk of text that you'd like to read comfortably. If you're using Readability on a landing page (like nytimes.com for example), please click into an article first before using Readability.</p>"
                 ].join('');
 
@@ -118,27 +100,9 @@ var readify = function readify(){
             overlay.id              = "readOverlay";
             innerDiv.id             = "readInner";
 
-            /* Apply user-selected styling */
-            document.body.className = readStyle;
-            document.dir            = readability.getSuggestedDirection(articleTitle.innerHTML);
-
-            if (readStyle === "style-athelas" || readStyle === "style-apertura"){
-                overlay.className = readStyle + " rdbTypekit";
-            }
-            else {
-                overlay.className = readStyle;
-            }
-            innerDiv.className    = readMargin + " " + readSize;
-
-            if(typeof(readConvertLinksToFootnotes) !== 'undefined' && readConvertLinksToFootnotes === true) {
-                readability.convertLinksToFootnotes = true;
-            }
-
             /* Glue the structure of our document together. */
             innerDiv.appendChild( articleTitle   );
             innerDiv.appendChild( articleContent );
-            innerDiv.appendChild( articleFooter  );
-             overlay.appendChild( articleTools   );
              overlay.appendChild( innerDiv       );
 
             /* Clear the old HTML, insert the new content. */
@@ -146,76 +110,9 @@ var readify = function readify(){
             document.body.insertBefore(overlay, document.body.firstChild);
             document.body.removeAttribute('style');
 
-            if(readability.frameHack)
-            {
-                var readOverlay = document.getElementById('readOverlay');
-                readOverlay.style.height = '100%';
-                readOverlay.style.overflow = 'auto';
-            }
-
-            /**
-             * If someone tries to use Readability on a site's root page, give them a warning about usage.
-            **/
-            if((window.location.protocol + "//" + window.location.host + "/") === window.location.href)
-            {
-                articleContent.style.display = "none";
-                var rootWarning = document.createElement('p');
-                    rootWarning.id = "readability-warning";
-                    rootWarning.innerHTML = "<em>Readability</em> was intended for use on individual articles and not home pages. " +
-                        "If you'd like to try rendering this page anyway, <a onClick='javascript:document.getElementById(\"readability-warning\").style.display=\"none\";document.getElementById(\"readability-content\").style.display=\"block\";'>click here</a> to continue.";
-
-                innerDiv.insertBefore( rootWarning, articleContent );
-            }
-
-            readability.postProcessContent(articleContent);
-
-            window.scrollTo(0, 0);
-
-            /* If we're using the Typekit library, select the font */
-            if (readStyle === "style-athelas" || readStyle === "style-apertura") {
-                readability.useRdbTypekit();
-            }
-
             if (nextPageLink) {
-                /** 
-                 * Append any additional pages after a small timeout so that people
-                 * can start reading without having to wait for this to finish processing.
-                **/
-                window.setTimeout(function() {
-                    readability.appendNextPage(nextPageLink);
-                }, 500);
+                readability.appendNextPage(nextPageLink);
             }
-
-            /** Smooth scrolling **/
-            document.onkeydown = function(e) {
-                var code = (window.event) ? event.keyCode : e.keyCode;
-                if (code === 16) {
-                    readability.reversePageScroll = true;
-                    return;
-                }
-
-                if (code === 32) {
-                    readability.curScrollStep = 0;
-                    var windowHeight = window.innerHeight ? window.innerHeight : (document.documentElement.clientHeight ? document.documentElement.clientHeight : document.body.clientHeight);
-
-                    if(readability.reversePageScroll) {
-                        readability.scrollTo(readability.scrollTop(), readability.scrollTop() - (windowHeight - 50), 20, 10);                   
-                    }
-                    else {
-                        readability.scrollTo(readability.scrollTop(), readability.scrollTop() + (windowHeight - 50), 20, 10);                   
-                    }
-                    
-                    return false;
-                }
-            };
-            
-            document.onkeyup = function(e) {
-                var code = (window.event) ? event.keyCode : e.keyCode;
-                if (code === 16) {
-                    readability.reversePageScroll = false;
-                    return;
-                }
-            };
 
             setTimeout(function(){
                 var readyEvent = document.createEvent("Event");
@@ -223,88 +120,8 @@ var readify = function readify(){
                 window.dispatchEvent(readyEvent);
             }, 1);
 
-            return { title: articleTitle.innerText, content: articleContent.innerHTML};
+            return { title: articleTitle.innerText, content: articleContent.innerHTML };
         },
-
-        /**
-         * Run any post-process modifications to article content as necessary.
-         * 
-         * @param Element
-         * @return void
-        **/
-        postProcessContent: function(articleContent) {
-            if(readability.convertLinksToFootnotes && !window.location.href.match(/wikipedia\.org/g)) {
-                readability.addFootnotes(articleContent);
-            }
-
-            readability.fixImageFloats(articleContent);
-        },
-
-        /**
-         * Some content ends up looking ugly if the image is too large to be floated.
-         * If the image is wider than a threshold (currently 55%), no longer float it,
-         * center it instead.
-         *
-         * @param Element
-         * @return void
-        **/
-        fixImageFloats: function (articleContent) {
-            var imageWidthThreshold = Math.min(articleContent.offsetWidth, 800) * 0.55,
-                images              = articleContent.getElementsByTagName('img');
-
-            for(var i=0, il = images.length; i < il; i+=1) {
-                var image = images[i];
-                
-                if(image.offsetWidth > imageWidthThreshold) {
-                    image.className += " blockImage";
-                }
-            }
-        },
-
-        /**
-         * Get the article tools Element that has buttons like reload, print, email.
-         *
-         * @return void
-         **/
-        getArticleTools: function () {
-            var articleTools = document.createElement("DIV");
-
-            articleTools.id        = "readTools";
-            articleTools.innerHTML = 
-                "<a href='#' onclick='return window.location.reload()' title='Reload original page' id='reload-page'>Reload Original Page</a>" +
-                "<a href='#' onclick='javascript:window.print();' title='Print page' id='print-page'>Print Page</a>" +
-                "<a href='#' onclick='readability.emailBox(); return false;' title='Email page' id='email-page'>Email Page</a>";
-
-            return articleTools;
-        },
-
-        /**
-         * retuns the suggested direction of the string
-         *
-         * @return "rtl" || "ltr"
-         **/
-        getSuggestedDirection: function(text) {
-            function sanitizeText() {
-                return text.replace(/@\w+/, "");
-            }
-            
-            function countMatches(match) {
-                var matches = text.match(new RegExp(match, "g"));
-                return matches !== null ? matches.length : 0; 
-            }
-            
-            function isRTL() {            
-                var count_heb =  countMatches("[\\u05B0-\\u05F4\\uFB1D-\\uFBF4]");
-                var count_arb =  countMatches("[\\u060C-\\u06FE\\uFB50-\\uFEFC]");
-
-                // if 20% of chars are Hebrew or Arbic then direction is rtl
-                return  (count_heb + count_arb) * 100 / text.length > 20;
-            }
-
-            text  = sanitizeText(text);
-            return isRTL() ? "rtl" : "ltr";
-        },
-
         
         /**
          * Get the article title as an H1.
@@ -360,39 +177,6 @@ var readify = function readify(){
             
             return articleTitle;
         },
-
-        /**
-         * Get the footer with the readability mark etc.
-         *
-         * @return void
-         **/
-        getArticleFooter: function () {
-            var articleFooter = document.createElement("DIV");
-
-            /**
-             * For research purposes, generate an img src that contains the chosen readstyle etc,
-             * so we can generate aggregate stats and change styles based on them in the future
-             **/
-            // var statsQueryParams = "?readStyle=" + encodeURIComponent(readStyle) + "&readMargin=" + encodeURIComponent(readMargin) + "&readSize=" + encodeURIComponent(readSize);
-            /* TODO: attach this to an image */
-
-            articleFooter.id = "readFooter";
-            articleFooter.innerHTML = [
-            "<div id='rdb-footer-print'>Excerpted from <cite>" + document.title + "</cite><br />" + window.location.href + "</div>",
-            "<div id='rdb-footer-wrapper'>",
-                 "<div id='rdb-footer-left'>",
-                     "<a href='http://lab.arc90.com/experiments/readability' id='readability-logo'>Readability &mdash;&nbsp;</a>",
-                     "<a href='http://www.arc90.com/' id='arc90-logo'> An Arc90 Laboratory Experiment&nbsp;</a>",
-                     " <span id='readability-url'> http://lab.arc90.com/experiments/readability</span>",
-                 "</div>",
-                 "<div id='rdb-footer-right'>",
-                     "<a href='http://www.twitter.com/arc90' class='footer-twitterLink'>Follow us on Twitter &raquo;</a>",
-                     "<span class='version'>Readability version " + readability.version + "</span>",
-                 "</div>",
-            "</div>"].join('');
-                    
-            return articleFooter;
-        },
         
         /**
          * Prepare the HTML document for readability to scrape it.
@@ -444,8 +228,6 @@ var readify = function readify(){
                     
                     if(canAccessFrame && frameSize > bestFrameSize)
                     {
-                        readability.frameHack = true;
-        
                         bestFrame = frames[frameIndex];
                         bestFrameSize = frameSize;
                     }
@@ -480,139 +262,6 @@ var readify = function readify(){
             /* Turn all double br's into p's */
             /* Note, this is pretty costly as far as processing goes. Maybe optimize later. */
             document.body.innerHTML = document.body.innerHTML.replace(readability.regexps.replaceBrs, '</p><p>').replace(readability.regexps.replaceFonts, '<$1span>');
-        },
-
-        /**
-         * For easier reading, convert this document to have footnotes at the bottom rather than inline links.
-         * @see http://www.roughtype.com/archives/2010/05/experiments_in.php
-         *
-         * @return void
-        **/
-        addFootnotes: function(articleContent) {
-            var footnotesWrapper = document.getElementById('readability-footnotes'),
-                articleFootnotes = document.getElementById('readability-footnotes-list');
-            
-            if(!footnotesWrapper) {
-                footnotesWrapper               = document.createElement("DIV");
-                footnotesWrapper.id            = 'readability-footnotes';
-                footnotesWrapper.innerHTML     = '<h3>References</h3>';
-                footnotesWrapper.style.display = 'none'; /* Until we know we have footnotes, don't show the references block. */
-                
-                articleFootnotes    = document.createElement('ol');
-                articleFootnotes.id = 'readability-footnotes-list';
-                
-                footnotesWrapper.appendChild(articleFootnotes);
-        
-                var readFooter = document.getElementById('readFooter');
-                
-                if(readFooter) {
-                    readFooter.parentNode.insertBefore(footnotesWrapper, readFooter);
-                }
-            }
-
-            var articleLinks = articleContent.getElementsByTagName('a');
-            var linkCount    = articleFootnotes.getElementsByTagName('li').length;
-            for (var i = 0; i < articleLinks.length; i+=1)
-            {
-                var articleLink  = articleLinks[i],
-                    footnoteLink = articleLink.cloneNode(true),
-                    refLink      = document.createElement('a'),
-                    footnote     = document.createElement('li'),
-                    linkDomain   = footnoteLink.host ? footnoteLink.host : document.location.host,
-                    linkText     = readability.getInnerText(articleLink);
-                
-                if(articleLink.className && articleLink.className.indexOf('readability-DoNotFootnote') !== -1 || linkText.match(readability.regexps.skipFootnoteLink)) {
-                    continue;
-                }
-                
-                linkCount+=1;
-
-                /** Add a superscript reference after the article link */
-                refLink.href      = '#readabilityFootnoteLink-' + linkCount;
-                refLink.innerHTML = '<small><sup>[' + linkCount + ']</sup></small>';
-                refLink.className = 'readability-DoNotFootnote';
-                try { refLink.style.color = 'inherit'; } catch(e) {} /* IE7 doesn't like inherit. */
-                
-                if(articleLink.parentNode.lastChild === articleLink) {
-                    articleLink.parentNode.appendChild(refLink);
-                } else {
-                    articleLink.parentNode.insertBefore(refLink, articleLink.nextSibling);
-                }
-
-                articleLink.name        = 'readabilityLink-' + linkCount;
-                try { articleLink.style.color = 'inherit'; } catch(err) {} /* IE7 doesn't like inherit. */
-
-                footnote.innerHTML      = "<small><sup><a href='#readabilityLink-" + linkCount + "' title='Jump to Link in Article'>^</a></sup></small> ";
-
-                footnoteLink.innerHTML  = (footnoteLink.title ? footnoteLink.title : linkText);
-                footnoteLink.name       = 'readabilityFootnoteLink-' + linkCount;
-                
-                footnote.appendChild(footnoteLink);
-                footnote.innerHTML = footnote.innerHTML + "<small> (" + linkDomain + ")</small>";
-                
-                articleFootnotes.appendChild(footnote);
-            }
-
-            if(linkCount > 0) {
-                footnotesWrapper.style.display = 'block';
-            }
-        },
-
-        useRdbTypekit: function () {
-            var rdbHead      = document.getElementsByTagName('head')[0];
-            var rdbTKScript  = document.createElement('script');
-            var rdbTKCode    = null;
-
-            var rdbTKLink    = document.createElement('a');
-                rdbTKLink.setAttribute('class','rdbTK-powered');
-                rdbTKLink.setAttribute('title','Fonts by Typekit');
-                rdbTKLink.innerHTML = "Fonts by <span class='rdbTK'>Typekit</span>";
-
-            if (readStyle === "style-athelas") {
-                rdbTKCode = "sxt6vzy";
-                dbg("Using Athelas Theme");
-
-                rdbTKLink.setAttribute('href','http://typekit.com/?utm_source=readability&utm_medium=affiliate&utm_campaign=athelas');
-                rdbTKLink.setAttribute('id','rdb-athelas');
-                document.getElementById("rdb-footer-right").appendChild(rdbTKLink);
-            }
-            if (readStyle === "style-apertura") {
-                rdbTKCode = "bae8ybu";
-                dbg("Using Inverse Theme");
-
-                rdbTKLink.setAttribute('href','http://typekit.com/?utm_source=readability&utm_medium=affiliate&utm_campaign=inverse');
-                rdbTKLink.setAttribute('id','rdb-inverse');
-                document.getElementById("rdb-footer-right").appendChild(rdbTKLink);
-            }
-
-            /**
-             * Setting new script tag attributes to pull Typekits libraries
-            **/
-            rdbTKScript.setAttribute('type','text/javascript');
-            rdbTKScript.setAttribute('src',"http://use.typekit.com/" + rdbTKCode + ".js");
-            rdbTKScript.setAttribute('charset','UTF-8');
-            rdbHead.appendChild(rdbTKScript);
-
-            /**
-             * In the future, maybe try using the following experimental Callback function?:
-             * http://gist.github.com/192350
-             * &
-             * http://getsatisfaction.com/typekit/topics/support_a_pre_and_post_load_callback_function
-            **/
-            var typekitLoader = function() {
-                dbg("Looking for Typekit.");
-                if(typeof Typekit !== "undefined") {
-                    try {
-                        dbg("Caught typekit");
-                        Typekit.load();
-                        clearInterval(window.typekitInterval);
-                    } catch(e) {
-                        dbg("Typekit error: " + e);
-                    }
-                }
-            };
-
-            window.typekitInterval = window.setInterval(typekitLoader, 100);
         },
 
         /**
@@ -1497,16 +1146,6 @@ var readify = function readify(){
 
                         thisPage.innerHTML = thisPage.innerHTML + content.innerHTML;
 
-                        /**
-                         * After the page has rendered, post process the content. This delay is necessary because,
-                         * in webkit at least, offsetWidth is not set in time to determine image width. We have to
-                         * wait a little bit for reflow to finish before we can fix floating images.
-                        **/
-                        window.setTimeout(
-                            function() { readability.postProcessContent(thisPage); },
-                            500
-                        );
-
                         if(nextPageLink) {
                             readability.appendNextPage(nextPageLink);
                         }
@@ -1698,114 +1337,6 @@ var readify = function readify(){
                     }
                 }
             }
-        },
-
-        /*** Smooth scrolling logic ***/
-        
-        /**
-         * easeInOut animation algorithm - returns an integer that says how far to move at this point in the animation.
-         * Borrowed from jQuery's easing library.
-         * @return integer
-        **/
-        easeInOut: function(start,end,totalSteps,actualStep) { 
-            var delta = end - start; 
-
-            if ((actualStep/=totalSteps/2) < 1) { 
-                return delta/2*actualStep*actualStep + start;
-            }
-            actualStep -=1;
-            return -delta/2 * ((actualStep)*(actualStep-2) - 1) + start;
-        },
-        
-        /**
-         * Helper function to, in a cross compatible way, get or set the current scroll offset of the document.
-         * @return mixed integer on get, the result of window.scrollTo on set
-        **/
-        scrollTop: function(scroll){
-            var setScroll = typeof scroll !== 'undefined';
-
-            if(setScroll) {
-                return window.scrollTo(0, scroll);
-            }
-            if(typeof window.pageYOffset !== 'undefined') {
-                return window.pageYOffset;
-            }
-            else if(document.documentElement.clientHeight) {
-                return document.documentElement.scrollTop;
-            }
-            else {
-                return document.body.scrollTop;
-            }
-        },
-        
-        /**
-         * scrollTo - Smooth scroll to the point of scrollEnd in the document.
-         * @return void
-        **/
-        curScrollStep: 0,
-        scrollTo: function (scrollStart, scrollEnd, steps, interval) {
-            if(
-                (scrollStart < scrollEnd && readability.scrollTop() < scrollEnd) ||
-                (scrollStart > scrollEnd && readability.scrollTop() > scrollEnd)
-              ) {
-                readability.curScrollStep+=1;
-                if(readability.curScrollStep > steps) {
-                    return;
-                }
-
-                var oldScrollTop = readability.scrollTop();
-                
-                readability.scrollTop(readability.easeInOut(scrollStart, scrollEnd, steps, readability.curScrollStep));
-
-                // We're at the end of the window.
-                if(oldScrollTop === readability.scrollTop()) {
-                    return;
-                }
-
-                window.setTimeout(function() {
-                    readability.scrollTo(scrollStart, scrollEnd, steps, interval);
-                }, interval);
-            }
-        },
-
-        
-        /**
-         * Show the email popup.
-         *
-         * @return void
-         **/
-        emailBox: function () {
-            var emailContainerExists = document.getElementById('email-container');
-            if(null !== emailContainerExists)
-            {
-                return;
-            }
-
-            var emailContainer = document.createElement("DIV");
-            emailContainer.setAttribute('id', 'email-container');
-            emailContainer.innerHTML = '<iframe src="'+readability.emailSrc + '?pageUrl='+encodeURIComponent(window.location)+'&pageTitle='+encodeURIComponent(document.title)+'" scrolling="no" onload="readability.removeFrame()" style="width:500px; height: 490px; border: 0;"></iframe>';
-
-            document.body.appendChild(emailContainer);          
-        },
-        
-        /**
-         * Close the email popup. This is a hacktackular way to check if we're in a "close loop".
-         * Since we don't have crossdomain access to the frame, we can only know when it has
-         * loaded again. If it's loaded over 3 times, we know to close the frame.
-         *
-         * @return void
-         **/
-        removeFrame: function () {
-            readability.iframeLoads+=1;
-            if (readability.iframeLoads > 3)
-            {
-                var emailContainer = document.getElementById('email-container');
-                if (null !== emailContainer) {
-                    emailContainer.parentNode.removeChild(emailContainer);
-                }
-
-                readability.iframeLoads = 0;
-            }           
         },
         
         htmlspecialchars: function (s) {
