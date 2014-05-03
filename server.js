@@ -89,7 +89,7 @@ function onRequest(req, res) {
 
     res.statusCode = statusCode
 
-    res.setHeader("Content-Type", "application/json")
+    res.setHeader("Content-Type", "application/json; charset=utf-8")
     res.setHeader("Content-Length", byteLength(data))
     res.setHeader("X-Rndrme-Bytes-Consumed", bytesConsumed.toString())
 
