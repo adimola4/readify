@@ -2,7 +2,7 @@ var system    = require("system")
 var webserver = require("webserver")
 var webpage   = require("webpage")
 
-var configPath = system.args[1] || "./config.js"
+var configPath = "./config.js"
 var config     = require(configPath)
 
 var readify = require('./readify')
@@ -13,13 +13,14 @@ if (!config.port) {
 }
 
 var server    = webserver.create()
-var port = Number(system.env.PORT) || config.port
+var port = Number(system.env.PORT || system.args[1]) || config.port
 var listening = server.listen(port, onRequest)
 
 if (!listening) {
   console.error("Could not bind to port " + port)
   phantom.exit(1)
 }
+console.log("Listening on port " + port)
 
 function onRequest(req, res) {
   var page          = webpage.create()
@@ -31,7 +32,9 @@ function onRequest(req, res) {
 
   var url = parse(req.url)
 
-  if (url.pathname != "/") {
+  if(url.pathname == "/test"){
+    return send(200, toHTML("Test is OK"))
+  } else if (url.pathname != "/") {
     return send(404, toHTML("Not found."))
   }
 

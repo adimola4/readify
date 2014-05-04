@@ -1,0 +1,10 @@
+GEM
+  remote: https://rubygems.org/
+  specs:
+    phantom-manager (0.1.0)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  phantom-manager
