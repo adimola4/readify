@@ -1,10 +1,12 @@
 GEM
   remote: https://rubygems.org/
   specs:
+    god (0.13.2)
     phantom-manager (0.1.0)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
+  god
   phantom-manager
