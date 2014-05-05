@@ -57,7 +57,7 @@ production:
   #If a phantom process memory consumption is over memory_limit for
   #memory_retries times with memory_check_interval between each check it will
   #be killed
-  memory_limit: 110000
+  memory_limit: 70000
   memory_retries: 5
   memory_check_interval: 5
   #Number of phantom processes to keep up. If a process is missing for
