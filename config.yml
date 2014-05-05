@@ -49,11 +49,11 @@ production:
   #phantoms, on ports 8000 8001 8002 8003 will be managed.
   phantom_base_port: 8002
   #Rails root path
-  rails_root: "path/to/readify"
+  rails_root: "/home/deploy/readify"
   #Path to your nginx configuration
-  nginx_conf: "./nginx/production.conf"
+  nginx_conf: "/home/deploy/readify/nginx/production.conf"
   #Path to where you want to keep your phantomjs logs
-  phantom_log_path: "path/to/readify/log/phantomjs.log"
+  phantom_log_path: "/home/deploy/readify/log/phantomjs.log"
   #If a phantom process memory consumption is over memory_limit for
   #memory_retries times with memory_check_interval between each check it will
   #be killed
