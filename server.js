@@ -6,6 +6,7 @@ var configPath = "./config.js"
 var config     = require(configPath)
 
 var readify = require('./readify')
+var benchmark = require('./benchmark')
 
 if (!config.port) {
   console.error("No port specified in " + configPath)
@@ -24,7 +25,6 @@ console.log("Listening on port " + port)
 
 function onRequest(req, res) {
   var page          = webpage.create()
-  var bytesConsumed = 0
 
   if (req.method != "GET") {
     return send(405, toHTML("Method not accepted."))
@@ -45,10 +45,9 @@ function onRequest(req, res) {
     return send(400, toHTML("`href` parameter is missing."))
   }
 
-  var maxTime    = Number(query.max_time)  || config.maxTime
-  var maxBytes   = Number(query.max_bytes) || config.maxBytes
-  var readyEvent = query.ready_event       || config.readyEvent
-  var loadImages = "load_images" in query  || config.loadImages
+  var maxTime    = config.maxTime
+  var readyEvent = config.readyEvent
+  var loadImages = config.loadImages
 
   page.settings.loadImages = loadImages
 
@@ -60,14 +59,6 @@ function onRequest(req, res) {
       window.addEventListener(readyEvent, function() {
         setTimeout(window.callPhantom, 0)
       })
-    }
-  }
-
-  page.onResourceReceived = function(resource) {
-    if (resource.bodySize) bytesConsumed += resource.bodySize
-
-    if (bytesConsumed > maxBytes) {
-      send(502, toHTML("More than " + maxBytes + "consumed."))
     }
   }
 
@@ -84,6 +75,7 @@ function onRequest(req, res) {
   var out;
 
   page.open(href, function(status){
+    page.injectJs('benchmark.js');
     out = page.evaluate(readify);
   })
 
@@ -94,7 +86,6 @@ function onRequest(req, res) {
 
     res.setHeader("Content-Type", "application/json; charset=utf-8")
     res.setHeader("Content-Length", byteLength(data))
-    res.setHeader("X-Rndrme-Bytes-Consumed", bytesConsumed.toString())
 
     res.write(data)
     res.close()

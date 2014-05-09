@@ -1,4 +1,4 @@
-var readify = function readify(){
+var readify = function (){
 
     var dbg = function(s) {
         console.log("Readability: " + s);
@@ -1364,6 +1364,10 @@ var readify = function readify(){
         }
         
     };
+
+    ['init', 'grabArticle', 'prepDocument'].forEach(function(m){
+        readability[m] = benchmark(m, readability[m]);
+    })
 
     return readability.init();
 
