@@ -246,19 +246,6 @@ var readify = function (){
                 }
             }
 
-            /* Remove all stylesheets */
-            for (var k=0;k < document.styleSheets.length; k+=1) {
-                if (document.styleSheets[k].href !== null && document.styleSheets[k].href.lastIndexOf("readability") === -1) {
-                    document.styleSheets[k].disabled = true;
-                }
-            }
-
-            /* Remove all style tags in head (not doing this on IE) - TODO: Why not? */
-            var styleTags = document.getElementsByTagName("style");
-            for (var st=0;st < styleTags.length; st+=1) {
-                styleTags[st].textContent = "";
-            }
-
             /* Turn all double br's into p's */
             /* Note, this is pretty costly as far as processing goes. Maybe optimize later. */
             document.body.innerHTML = document.body.innerHTML.replace(readability.regexps.replaceBrs, '</p><p>').replace(readability.regexps.replaceFonts, '<$1span>');

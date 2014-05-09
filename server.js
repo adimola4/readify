@@ -67,14 +67,16 @@ function onRequest(req, res) {
   }
 
   page.onConsoleMessage = function(msg) {
-    console.log('page: ' + msg);
+    if((/^(Readability|Benchmark)/).test(msg)){
+      console.log('page: ' + msg);
+    }
   };
 
   var timeout = setTimeout(page.onCallback, maxTime)
 
-  var out;
-
+  var out, startedAt = new Date;
   page.open(href, function(status){
+    console.log("Benchmark - url open: " + ( (new Date).getTime() - startedAt.getTime() ) + "ms");
     page.injectJs('benchmark.js');
     out = page.evaluate(readify);
   })
