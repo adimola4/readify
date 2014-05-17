@@ -44,7 +44,7 @@ var readify = function (){
             trim:                  /^\s+|\s+$/g,
             normalize:             /\s{2,}/g,
             killBreaks:            /(<br\s*\/?>(\s|&nbsp;?)*){1,}/g,
-            videos:                /http:\/\/(www\.)?(youtube|vimeo)\.com/i,
+            videos:                /(youtube|vimeo|dailymotion|metacafe|vine|rutube|brightcove)\.com/i,
             skipFootnoteLink:      /^\s*(\[?[a-z0-9]{1,2}\]?|^|edit|citation needed)\s*$/i,
             nextLink:              /(next|weiter|continue|>([^\|]|$)|»([^\|]|$))/i, // Match: next, continue, >, >>, » but not >|, »| as those usually mean last.
             prevLink:              /(prev|earl|old|new|<|«)/i
@@ -399,7 +399,7 @@ var readify = function (){
                 }
 
                 /* Turn all divs that don't have children block level elements into p's */
-                if (node.tagName === "DIV") {
+                if (node.tagName === "DIV" || node.tagName == "ARTICLE" || node.tagName == "HEADER" || node.tagName == "SECTION") {
                     if (node.innerHTML.search(readability.regexps.divToPElements) === -1) {
                         var newNode = document.createElement('p');
                         try {
@@ -1207,7 +1207,7 @@ var readify = function (){
          **/
         clean: function (e, tag) {
             var targetList = e.getElementsByTagName( tag );
-            var isEmbed    = (tag === 'object' || tag === 'embed');
+            var isEmbed    = (tag === 'object' || tag === 'embed' || tag === 'iframe' || tag === 'video');
             
             for (var y=targetList.length-1; y >= 0; y-=1) {
                 /* Allow youtube and vimeo videos through as people usually want to see those. */
