@@ -63,7 +63,7 @@ production:
   #Number of phantom processes to keep up. If a process is missing for
   #processes_check_retries times in a row with processes_check_interval between
   #checks it will be brought up byt the monitor
-  phantom_processes_number: 6
+  phantom_processes_number: 2
   processes_check_retries: 3
   processes_check_interval: 15
 
