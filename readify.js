@@ -76,7 +76,7 @@ var readify = function (){
             readability.parsedPages[window.location.href.replace(/\/$/, '')] = true;
 
             /* Pull out any possible next page link first */
-            var nextPageLink = readability.findNextPageLink(document.body);
+            // var nextPageLink = readability.findNextPageLink(document.body);
             
             readability.prepDocument();
 
@@ -86,33 +86,9 @@ var readify = function (){
             var articleTitle   = readability.getArticleTitle();
             var articleContent = readability.grabArticle();
 
-            if(!articleContent) {
-                articleContent    = document.createElement("DIV");
-                articleContent.id = "readability-content";
-                articleContent.innerHTML = [
-                    "<p>Sorry, readability was unable to parse this page for content. If you feel like it should have been able to, please <a href='http://code.google.com/p/arc90labs-readability/issues/entry'>let us know by submitting an issue.</a></p>",
-                    "<p>Also, please note that Readability does not play very nicely with front pages. Readability is intended to work on articles with a sizable chunk of text that you'd like to read comfortably. If you're using Readability on a landing page (like nytimes.com for example), please click into an article first before using Readability.</p>"
-                ].join('');
-
-                nextPageLink = null;
-            }
-
-            overlay.id              = "readOverlay";
-            innerDiv.id             = "readInner";
-
-            /* Glue the structure of our document together. */
-            innerDiv.appendChild( articleTitle   );
-            innerDiv.appendChild( articleContent );
-             overlay.appendChild( innerDiv       );
-
-            /* Clear the old HTML, insert the new content. */
-            document.body.innerHTML = "";
-            document.body.insertBefore(overlay, document.body.firstChild);
-            document.body.removeAttribute('style');
-
-            if (nextPageLink) {
-                readability.appendNextPage(nextPageLink);
-            }
+            // if (nextPageLink) {
+            //     readability.appendNextPage(nextPageLink);
+            // }
 
             setTimeout(function(){
                 var readyEvent = document.createEvent("Event");
@@ -120,7 +96,7 @@ var readify = function (){
                 window.dispatchEvent(readyEvent);
             }, 1);
 
-            return { title: articleTitle.innerText, content: articleContent.innerHTML };
+            return { title: articleTitle.innerText, content: articleContent && articleContent.innerHTML };
         },
         
         /**
@@ -608,10 +584,6 @@ var readify = function (){
              * So we have all of the content that we need. Now we clean it up for presentation.
             **/
             readability.prepArticle(articleContent);
-
-            if (readability.curPageNum === 1) {
-                articleContent.innerHTML = '<div id="readability-page-1" class="page">' + articleContent.innerHTML + '</div>';
-            }
 
             /**
              * Now that we've gone through the full algorithm, check to see if we got any meaningful content.
