@@ -20,9 +20,9 @@ development:
   #Number of phantom processes to keep up. If a process is missing for
   #processes_check_retries times in a row with processes_check_interval between
   #checks it will be brought up byt the monitor
-  phantom_processes_number: 4
-  processes_check_retries: 1
-  processes_check_interval: 10
+  phantom_processes_number: 3
+  processes_check_retries: 2
+  processes_check_interval: 5
 
   #Command to issue when launching phantomjs
   phantom_command: 'phantomjs server.js'
@@ -59,9 +59,9 @@ production:
   #Number of phantom processes to keep up. If a process is missing for
   #processes_check_retries times in a row with processes_check_interval between
   #checks it will be brought up byt the monitor
-  phantom_processes_number: 4
-  processes_check_retries: 1
-  processes_check_interval: 10
+  phantom_processes_number: 3
+  processes_check_retries: 2
+  processes_check_interval: 5
 
   #Command to issue when launching phantomjs
   phantom_command: 'phantomjs server.js'
