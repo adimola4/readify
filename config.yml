@@ -14,13 +14,13 @@ development:
   #If a phantom process memory consumption is over memory_limit for
   #memory_retries times with memory_check_interval between each check it will
   #be killed
-  memory_limit: 80000
+  memory_limit: 100000
   memory_retries: 5
   memory_check_interval: 5
   #Number of phantom processes to keep up. If a process is missing for
   #processes_check_retries times in a row with processes_check_interval between
   #checks it will be brought up byt the monitor
-  phantom_processes_number: 3
+  phantom_processes_number: 2
   processes_check_retries: 2
   processes_check_interval: 5
 
@@ -53,13 +53,13 @@ production:
   #If a phantom process memory consumption is over memory_limit for
   #memory_retries times with memory_check_interval between each check it will
   #be killed
-  memory_limit: 80000
+  memory_limit: 100000
   memory_retries: 5
   memory_check_interval: 5
   #Number of phantom processes to keep up. If a process is missing for
   #processes_check_retries times in a row with processes_check_interval between
   #checks it will be brought up byt the monitor
-  phantom_processes_number: 3
+  phantom_processes_number: 2
   processes_check_retries: 2
   processes_check_interval: 5
 
