@@ -9,22 +9,20 @@ development:
   phantom_base_port: 8002
   #Rails root path
   rails_root: "~/Documents/projects/readify"
-  #Path to your nginx configuration
-  nginx_conf: "./nginx/development.conf"
   #Path to where you want to keep your phantomjs logs
   phantom_log_path: "~/Documents/projects/readify/log/phantomjs.log"
   #If a phantom process memory consumption is over memory_limit for
   #memory_retries times with memory_check_interval between each check it will
   #be killed
-  memory_limit: 110000
+  memory_limit: 80000
   memory_retries: 5
   memory_check_interval: 5
   #Number of phantom processes to keep up. If a process is missing for
   #processes_check_retries times in a row with processes_check_interval between
   #checks it will be brought up byt the monitor
-  phantom_processes_number: 2
-  processes_check_retries: 3
-  processes_check_interval: 15
+  phantom_processes_number: 4
+  processes_check_retries: 1
+  processes_check_interval: 10
 
   #Command to issue when launching phantomjs
   phantom_command: 'phantomjs server.js'
@@ -50,22 +48,20 @@ production:
   phantom_base_port: 8002
   #Rails root path
   rails_root: "/home/deploy/readify"
-  #Path to your nginx configuration
-  nginx_conf: "/home/deploy/readify/nginx/production.conf"
   #Path to where you want to keep your phantomjs logs
   phantom_log_path: "/home/deploy/readify/log/phantomjs.log"
   #If a phantom process memory consumption is over memory_limit for
   #memory_retries times with memory_check_interval between each check it will
   #be killed
-  memory_limit: 100000
+  memory_limit: 80000
   memory_retries: 5
   memory_check_interval: 5
   #Number of phantom processes to keep up. If a process is missing for
   #processes_check_retries times in a row with processes_check_interval between
   #checks it will be brought up byt the monitor
-  phantom_processes_number: 2
-  processes_check_retries: 3
-  processes_check_interval: 15
+  phantom_processes_number: 4
+  processes_check_retries: 1
+  processes_check_interval: 10
 
   #Command to issue when launching phantomjs
   phantom_command: 'phantomjs server.js'
