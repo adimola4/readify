@@ -62,6 +62,23 @@ function onRequest(req, res) {
     }
   }
 
+  page.onResourceRequested = function(requestData, networkRequest){
+    if(requestData.id > 1 && !/(\.css|\.js|\.png|\.gif|\.jpe?g)(\?.*)?$/.test(requestData.url)){
+       var i, l, curItem, abort = true;
+       for(i = 0, l = requestData.headers.length; i < l; ++i){
+         curItem = requestData.headers[i];
+         if(curItem.name.toLowerCase() == 'x-requested-with' && curItem.value.toLowerCase() == 'xmlhttprequest'){
+           abort = false;
+           break;
+         }
+       }
+       if(abort){
+        networkRequest.abort();
+        console.log('aborted request : ' + requestData.url );
+       }
+    }
+  }
+
   page.onCallback = function() {
     send(200, JSON.stringify(out))
   }
