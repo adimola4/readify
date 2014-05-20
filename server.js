@@ -24,7 +24,7 @@ if (!listening) {
 console.log("Listening on port " + port)
 
 function onRequest(req, res) {
-  var page          = webpage.create()
+  var page          = webpage.create(), requestServed = false;
 
   if (req.method != "GET") {
     return send(405, toHTML("Method not accepted."))
@@ -99,17 +99,21 @@ function onRequest(req, res) {
   })
 
   function send(statusCode, data) {
-    clearTimeout(timeout)
+    console.log('sending ...')
+    if(!requestServed){
+      clearTimeout(timeout)
 
-    res.statusCode = statusCode
+      res.statusCode = statusCode
 
-    res.setHeader("Content-Type", "application/json; charset=utf-8")
-    res.setHeader("Content-Length", byteLength(data))
+      res.setHeader("Content-Type", "application/json; charset=utf-8")
+      res.setHeader("Content-Length", byteLength(data))
 
-    res.write(data)
-    res.close()
+      res.write(data)
+      res.close()
 
-    page.close()
+      page.close()
+      requestServed = true;
+    }
   }
 }
 
