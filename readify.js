@@ -1152,7 +1152,7 @@ var readify = function (){
         },
 
         nodeIsVisible: function (node) {
-            return (node.offsetWidth !== 0 || node.offsetHeight !== 0) && node.style.display.toLowerCase() !== 'none' && node.style.visibility.toLowerCase() === 'visible';
+            return (node.offsetWidth !== 0 || node.offsetHeight !== 0) && node.style.display.toLowerCase() !== 'none' && node.style.visibility.toLowerCase() !== 'hidden';
         },
 
         /**
