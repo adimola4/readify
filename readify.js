@@ -360,7 +360,8 @@ var readify = function (){
                             unlikelyMatchString.search(readability.regexps.unlikelyCandidates) !== -1 &&
                             unlikelyMatchString.search(readability.regexps.okMaybeItsACandidate) === -1 &&
                             node.tagName !== "BODY"
-                        )
+
+                        ) || !readability.nodeIsVisible(node)
                     )
                     {
                         dbg("Removing unlikely candidate - " + unlikelyMatchString);
@@ -1151,7 +1152,7 @@ var readify = function (){
         },
 
         nodeIsVisible: function (node) {
-            return (node.offsetWidth !== 0 || node.offsetHeight !== 0) && node.style.display.toLowerCase() !== 'none';
+            return (node.offsetWidth !== 0 || node.offsetHeight !== 0) && node.style.display.toLowerCase() !== 'none' && node.style.visibility.toLowerCase() === 'visible';
         },
 
         /**
