@@ -74,6 +74,11 @@ var readify = function (){
             var innerDiv       = document.createElement("DIV");
             var articleTitle   = readability.getArticleTitle();
             var articleContent = readability.grabArticle();
+            var articleCoverImage = articleContent && readability.getBestImage(articleContent, true);
+            if(!articleCoverImage){
+              articleCoverImage = readability.getBestImage(document.body);
+              articleContent.insertBefore(articleCoverImage, articleContent.firstChild);
+            }
 
             setTimeout(function(){
                 var readyEvent = document.createEvent("Event");
@@ -81,7 +86,37 @@ var readify = function (){
                 window.dispatchEvent(readyEvent);
             }, 1);
 
-            return { title: articleTitle.innerText, content: articleContent && articleContent.innerHTML };
+            return {
+                title: articleTitle.innerText,
+                content: articleContent && articleContent.innerHTML };
+        },
+
+        getBestImage: function(elem, loose){
+            var minSize = 200*100, minRatio = 1/2, maxRatio = 2;
+            if(loose){
+                minRatio = 1/3;
+                maxRatio = 3;
+            }
+            var images = elem.getElementsByTagName("img");
+            var bestImg = null, curImg, l, i, curRatio, curSize, bestSize;
+            for(i = 0, l = images.length; i < l; ++i){
+                curImg = images[i];
+                if(curImg.src && curImg.width && curImg.height){
+                    curRatio = curImg.width / curImg.height;
+                    curSize = curImg.width * curImg.height;
+                    if(curRatio < minRatio || curRatio > maxRatio || curSize < minSize){
+                        continue;
+                    }
+                    if(!bestImg || curSize > bestSize){
+                        bestSize = curSize;
+                        bestImg = curImg;
+                    }
+                }
+            }
+            if(bestImg){
+                bestImg.src = bestImg.src;
+            }
+            return bestImg;
         },
         
         /**
