@@ -16,7 +16,6 @@ var readify = function (){
     **/
     var readability = {
         biggestFrame:            false,
-        bodyCache:               null,   /* Cache the body HTML in case we need to re-use it later */
         flags:                   0x1 | 0x2 | 0x4,   /* Start with all flags set. */
 
         /* constants */
@@ -61,17 +60,9 @@ var readify = function (){
             window.onload = window.onunload = function() {};
 
             readability.removeScripts(document);
-
-            if(document.body && !readability.bodyCache) {
-                readability.bodyCache = document.body.innerHTML;
-
-            }
             
             readability.prepDocument();
 
-            /* Build readability's DOM tree */
-            var overlay        = document.createElement("DIV");
-            var innerDiv       = document.createElement("DIV");
             var articleTitle   = readability.getArticleTitle();
             var articleContent = readability.grabArticle();
             var articleCoverImage = articleContent && readability.getBestImage(articleContent, true);
@@ -197,8 +188,6 @@ var readify = function (){
                 }
             }
 
-            document.body.id = "readabilityBody";
-
             var frames = document.getElementsByTagName('frame');
             if(frames.length > 0)
             {
@@ -296,6 +285,9 @@ var readify = function (){
             }
             catch (e) {
                 dbg("Cleaning innerHTML of breaks failed. This is an IE strict-block-elements bug. Ignoring.: " + e);
+            }
+            while(articleContent.children.length == 1){
+                articleContent.innerHTML = articleContent.firstChild.innerHTML;
             }
         },
         
@@ -417,8 +409,6 @@ var readify = function (){
                             if(childNode.nodeType === 3) { // Node.TEXT_NODE
                                 var p = document.createElement('p');
                                 p.innerHTML = childNode.nodeValue;
-                                p.style.display = 'inline';
-                                p.className = 'readability-styled';
                                 childNode.parentNode.replaceChild(p, childNode);
                             }
                         }
@@ -590,10 +580,8 @@ var readify = function (){
                         sl-=1;
                     }
                     
-                    /* To ensure a node does not interfere with readability styles, remove its classnames */
-                    nodeToAppend.className = "";
-
                     /* Append sibling and subtract from our list because it removes the node when you append to another node */
+                   
                     articleContent.appendChild(nodeToAppend);
                 }
             }
@@ -705,17 +693,16 @@ var readify = function (){
                 return; }
 
             // Remove any root styles, if we're able.
-            if(typeof e.removeAttribute === 'function' && e.className !== 'readability-styled') {
+            if(typeof e.removeAttribute === 'function') {
                 e.removeAttribute('style'); }
 
             // Go until there are no more child nodes
             while ( cur !== null ) {
                 if ( cur.nodeType === 1 ) {
-                    // Remove style attribute(s) :
-                    if(cur.className !== "readability-styled") {
-                        cur.removeAttribute("style");                   
-                    }
+                    cur.removeAttribute("style");
                     readability.cleanStyles( cur );
+                } else if (cur.nodeType === 8) {
+                    cur.parentNode.removeChild(cur);
                 }
                 cur = cur.nextSibling;
             }           
