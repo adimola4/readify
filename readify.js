@@ -24,10 +24,6 @@ var readify = function (){
         FLAG_WEIGHT_CLASSES:      0x2,
         FLAG_CLEAN_CONDITIONALLY: 0x4,
 
-        maxPages:    30, /* The maximum number of pages to loop through before we call it quits and just show a link. */
-        parsedPages: {}, /* The list of pages we've parsed in this call of readability, for autopaging. As a key store for easier searching. */
-        pageETags:   {}, /* A list of the ETag headers of pages we've parsed, in case they happen to match, we'll know it's a duplicate. */
-        
         /**
          * All of the regular expressions in use within readability.
          * Defined up here so we don't instantiate them repeatedly in loops.
@@ -45,9 +41,7 @@ var readify = function (){
             normalize:             /\s{2,}/g,
             killBreaks:            /(<br\s*\/?>(\s|&nbsp;?)*){1,}/g,
             videos:                /(youtube|vimeo|dailymotion|metacafe|vine|rutube|brightcove)\.com/i,
-            skipFootnoteLink:      /^\s*(\[?[a-z0-9]{1,2}\]?|^|edit|citation needed)\s*$/i,
-            nextLink:              /(next|weiter|continue|>([^\|]|$)|»([^\|]|$))/i, // Match: next, continue, >, >>, » but not >|, »| as those usually mean last.
-            prevLink:              /(prev|earl|old|new|<|«)/i
+            skipFootnoteLink:      /^\s*(\[?[a-z0-9]{1,2}\]?|^|edit|citation needed)\s*$/i
         },
 
         /**
@@ -72,11 +66,6 @@ var readify = function (){
                 readability.bodyCache = document.body.innerHTML;
 
             }
-            /* Make sure this document is added to the list of parsed pages first, so we don't double up on the first page */
-            readability.parsedPages[window.location.href.replace(/\/$/, '')] = true;
-
-            /* Pull out any possible next page link first */
-            // var nextPageLink = readability.findNextPageLink(document.body);
             
             readability.prepDocument();
 
@@ -85,10 +74,6 @@ var readify = function (){
             var innerDiv       = document.createElement("DIV");
             var articleTitle   = readability.getArticleTitle();
             var articleContent = readability.grabArticle();
-
-            // if (nextPageLink) {
-            //     readability.appendNextPage(nextPageLink);
-            // }
 
             setTimeout(function(){
                 var readyEvent = document.createEvent("Event");
@@ -332,11 +317,10 @@ var readify = function (){
          * @param page a document to run upon. Needs to be a full document, complete with body.
          * @return Element
         **/
-        grabArticle: function (page) {
-            var stripUnlikelyCandidates = readability.flagIsActive(readability.FLAG_STRIP_UNLIKELYS),
-                isPaging = (page !== null) ? true: false;
+        grabArticle: function () {
+            var stripUnlikelyCandidates = readability.flagIsActive(readability.FLAG_STRIP_UNLIKELYS);
 
-            page = page ? page : document.body;
+            page = document.body;
 
             var pageCacheHtml = page.innerHTML;
 
@@ -495,9 +479,7 @@ var readify = function (){
              * Things like preambles, content split by ads that we removed, etc.
             **/
             var articleContent        = document.createElement("DIV");
-            if (isPaging) {
-                articleContent.id     = "readability-content";
-            }
+            
             var siblingScoreThreshold = Math.max(10, topCandidate.readability.contentScore * 0.2);
             var siblingNodes          = topCandidate.parentNode.childNodes;
 
@@ -789,338 +771,6 @@ var readify = function (){
             return window.location.protocol + "//" + window.location.host + cleanedSegments.reverse().join("/");
         },
 
-        /**
-         * Look for any paging links that may occur within the document.
-         * 
-         * @param body
-         * @return object (array)
-        **/
-        findNextPageLink: function (elem) {
-            var possiblePages = {},
-                allLinks = elem.getElementsByTagName('a'),
-                articleBaseUrl = readability.findBaseUrl();
-
-            /**
-             * Loop through all links, looking for hints that they may be next-page links.
-             * Things like having "page" in their textContent, className or id, or being a child
-             * of a node with a page-y className or id.
-             *
-             * Also possible: levenshtein distance? longest common subsequence?
-             *
-             * After we do that, assign each page a score, and 
-            **/
-            for(var i = 0, il = allLinks.length; i < il; i+=1) {
-                var link     = allLinks[i],
-                    linkHref = allLinks[i].href.replace(/#.*$/, '').replace(/\/$/, '');
-
-                /* If we've already seen this page, ignore it */
-                if(linkHref === "" || linkHref === articleBaseUrl || linkHref === window.location.href || linkHref in readability.parsedPages) {
-                    continue;
-                }
-                
-                /* If it's on a different domain, skip it. */
-                if(window.location.host !== linkHref.split(/\/+/g)[1]) {
-                    continue;
-                }
-                
-                var linkText = readability.getInnerText(link);
-
-                /* If the linkText looks like it's not the next page, skip it. */
-                if(linkText.match(readability.regexps.extraneous) || linkText.length > 25) {
-                    continue;
-                }
-
-                /* If the leftovers of the URL after removing the base URL don't contain any digits, it's certainly not a next page link. */
-                var linkHrefLeftover = linkHref.replace(articleBaseUrl, '');
-                if(!linkHrefLeftover.match(/\d/)) {
-                    continue;
-                }
-                
-                if(!(linkHref in possiblePages)) {
-                    possiblePages[linkHref] = {"score": 0, "linkText": linkText, "href": linkHref};             
-                } else {
-                    possiblePages[linkHref].linkText += ' | ' + linkText;
-                }
-
-                var linkObj = possiblePages[linkHref];
-
-                /**
-                 * If the articleBaseUrl isn't part of this URL, penalize this link. It could still be the link, but the odds are lower.
-                 * Example: http://www.actionscript.org/resources/articles/745/1/JavaScript-and-VBScript-Injection-in-ActionScript-3/Page1.html
-                **/
-                if(linkHref.indexOf(articleBaseUrl) !== 0) {
-                    linkObj.score -= 25;
-                }
-
-                var linkData = linkText + ' ' + link.className + ' ' + link.id;
-                if(linkData.match(readability.regexps.nextLink)) {
-                    linkObj.score += 50;
-                }
-                if(linkData.match(/pag(e|ing|inat)/i)) {
-                    linkObj.score += 25;
-                }
-                if(linkData.match(/(first|last)/i)) { // -65 is enough to negate any bonuses gotten from a > or » in the text, 
-                    /* If we already matched on "next", last is probably fine. If we didn't, then it's bad. Penalize. */
-                    if(!linkObj.linkText.match(readability.regexps.nextLink)) {
-                        linkObj.score -= 65;
-                    }
-                }
-                if(linkData.match(readability.regexps.negative) || linkData.match(readability.regexps.extraneous)) {
-                    linkObj.score -= 50;
-                }
-                if(linkData.match(readability.regexps.prevLink)) {
-                    linkObj.score -= 200;
-                }
-
-                /* If a parentNode contains page or paging or paginat */
-                var parentNode = link.parentNode,
-                    positiveNodeMatch = false,
-                    negativeNodeMatch = false;
-                while(parentNode) {
-                    var parentNodeClassAndId = parentNode.className + ' ' + parentNode.id;
-                    if(!positiveNodeMatch && parentNodeClassAndId && parentNodeClassAndId.match(/pag(e|ing|inat)/i)) {
-                        positiveNodeMatch = true;
-                        linkObj.score += 25;
-                    }
-                    if(!negativeNodeMatch && parentNodeClassAndId && parentNodeClassAndId.match(readability.regexps.negative)) {
-                        /* If this is just something like "footer", give it a negative. If it's something like "body-and-footer", leave it be. */
-                        if(!parentNodeClassAndId.match(readability.regexps.positive)) {
-                            linkObj.score -= 25;
-                            negativeNodeMatch = true;                       
-                        }
-                    }
-                    
-                    parentNode = parentNode.parentNode;
-                }
-
-                /**
-                 * If the URL looks like it has paging in it, add to the score.
-                 * Things like /page/2/, /pagenum/2, ?p=3, ?page=11, ?pagination=34
-                **/
-                if (linkHref.match(/p(a|g|ag)?(e|ing|ination)?(=|\/)[0-9]{1,2}/i) || linkHref.match(/(page|paging)/i)) {
-                    linkObj.score += 25;
-                }
-
-                /* If the URL contains negative values, give a slight decrease. */
-                if (linkHref.match(readability.regexps.extraneous)) {
-                    linkObj.score -= 15;
-                }
-
-                /**
-                 * Minor punishment to anything that doesn't match our current URL.
-                 * NOTE: I'm finding this to cause more harm than good where something is exactly 50 points.
-                 *       Dan, can you show me a counterexample where this is necessary?
-                 * if (linkHref.indexOf(window.location.href) !== 0) {
-                 *    linkObj.score -= 1;
-                 * }
-                **/
-
-                /**
-                 * If the link text can be parsed as a number, give it a minor bonus, with a slight
-                 * bias towards lower numbered pages. This is so that pages that might not have 'next'
-                 * in their text can still get scored, and sorted properly by score.
-                **/
-                var linkTextAsNumber = parseInt(linkText, 10);
-                if(linkTextAsNumber) {
-                    // Punish 1 since we're either already there, or it's probably before what we want anyways.
-                    if (linkTextAsNumber === 1) {
-                        linkObj.score -= 10;
-                    }
-                    else {
-                        // Todo: Describe this better
-                        linkObj.score += Math.max(0, 10 - linkTextAsNumber);
-                    }
-                }
-            }
-
-            /**
-             * Loop thrugh all of our possible pages from above and find our top candidate for the next page URL.
-             * Require at least a score of 50, which is a relatively high confidence that this page is the next link.
-            **/
-            var topPage = null;
-            for(var page in possiblePages) {
-                if(possiblePages.hasOwnProperty(page)) {
-                    if(possiblePages[page].score >= 50 && (!topPage || topPage.score < possiblePages[page].score)) {
-                        topPage = possiblePages[page];
-                    }
-                }
-            }
-
-            if(topPage) {
-                var nextHref = topPage.href.replace(/\/$/,'');
-
-                dbg('NEXT PAGE IS ' + nextHref);
-                readability.parsedPages[nextHref] = true;
-                return nextHref;            
-            }
-            else {
-                return null;
-            }
-        },
-
-        /**
-         * Build a simple cross browser compatible XHR.
-         *
-         * TODO: This could likely be simplified beyond what we have here right now. There's still a bit of excess junk.
-        **/
-        xhr: function () {
-            if (typeof XMLHttpRequest !== 'undefined' && (window.location.protocol !== 'file:' || !window.ActiveXObject)) {
-                return new XMLHttpRequest();
-            }
-            else {
-                try { return new ActiveXObject('Msxml2.XMLHTTP.6.0'); } catch(sixerr) { }
-                try { return new ActiveXObject('Msxml2.XMLHTTP.3.0'); } catch(threrr) { }
-                try { return new ActiveXObject('Msxml2.XMLHTTP'); } catch(err) { }
-            }
-
-            return false;
-        },
-
-        successfulRequest: function (request) {
-            return (request.status >= 200 && request.status < 300) || request.status === 304 || (request.status === 0 && request.responseText);
-        },
-
-        ajax: function (url, options) {
-            var request = readability.xhr();
-
-            function respondToReadyState(readyState) {
-                if (request.readyState === 4) {
-                    if (readability.successfulRequest(request)) {
-                        if (options.success) { options.success(request); }
-                    }
-                    else {
-                        if (options.error) { options.error(request); }
-                    }
-                }
-            }
-
-            if (typeof options === 'undefined') { options = {}; }
-
-            request.onreadystatechange = respondToReadyState;
-            
-            request.open('get', url, true);
-            request.setRequestHeader('Accept', 'text/html');
-
-            try {
-                request.send(options.postBody);
-            }
-            catch (e) {
-                if (options.error) { options.error(); }
-            }
-
-            return request;
-        },
-
-        /**
-         * Make an AJAX request for each page and append it to the document.
-        **/
-        curPageNum: 1,
-
-        appendNextPage: function (nextPageLink) {
-            readability.curPageNum+=1;
-
-            var articlePage       = document.createElement("DIV");
-            articlePage.id        = 'readability-page-' + readability.curPageNum;
-            articlePage.className = 'page';
-            articlePage.innerHTML = '<p class="page-separator" title="Page ' + readability.curPageNum + '">&sect;</p>';
-
-            document.getElementById("readability-content").appendChild(articlePage);
-
-            if(readability.curPageNum > readability.maxPages) {
-                var nextPageMarkup = "<div style='text-align: center'><a href='" + nextPageLink + "'>View Next Page</a></div>";
-
-                articlePage.innerHTML = articlePage.innerHTML + nextPageMarkup;
-                return;
-            }
-            
-            /**
-             * Now that we've built the article page DOM element, get the page content
-             * asynchronously and load the cleaned content into the div we created for it.
-            **/
-            (function(pageUrl, thisPage) {
-                readability.ajax(pageUrl, {
-                    success: function(r) {
-
-                        /* First, check to see if we have a matching ETag in headers - if we do, this is a duplicate page. */
-                        var eTag = r.getResponseHeader('ETag');
-                        if(eTag) {
-                            if(eTag in readability.pageETags) {
-                                dbg("Exact duplicate page found via ETag. Aborting.");
-                                articlePage.style.display = 'none';
-                                return;
-                            } else {
-                                readability.pageETags[eTag] = 1;
-                            }                       
-                        }
-
-                        // TODO: this ends up doubling up page numbers on NYTimes articles. Need to generically parse those away.
-                        var page = document.createElement("DIV");
-
-                        /**
-                         * Do some preprocessing to our HTML to make it ready for appending.
-                         * • Remove any script tags. Swap and reswap newlines with a unicode character because multiline regex doesn't work in javascript.
-                         * • Turn any noscript tags into divs so that we can parse them. This allows us to find any next page links hidden via javascript.
-                         * • Turn all double br's into p's - was handled by prepDocument in the original view.
-                         *   Maybe in the future abstract out prepDocument to work for both the original document and AJAX-added pages.
-                        **/
-                        var responseHtml = r.responseText.replace(/\n/g,'\uffff').replace(/<script.*?>.*?<\/script>/gi, '');
-                        responseHtml = responseHtml.replace(/\n/g,'\uffff').replace(/<script.*?>.*?<\/script>/gi, '');
-                        responseHtml = responseHtml.replace(/\uffff/g,'\n').replace(/<(\/?)noscript/gi, '<$1div');
-                        responseHtml = responseHtml.replace(readability.regexps.replaceBrs, '</p><p>');
-                        responseHtml = responseHtml.replace(readability.regexps.replaceFonts, '<$1span>');
-                        
-                        page.innerHTML = responseHtml;
-
-                        /**
-                         * Reset all flags for the next page, as they will search through it and disable as necessary at the end of grabArticle.
-                        **/
-                        readability.flags = 0x1 | 0x2 | 0x4;
-
-                        var nextPageLink = readability.findNextPageLink(page),
-                            content      =  readability.grabArticle(page);
-
-                        if(!content) {
-                            dbg("No content found in page to append. Aborting.");
-                            return;
-                        }
-
-                        /**
-                         * Anti-duplicate mechanism. Essentially, get the first paragraph of our new page.
-                         * Compare it against all of the the previous document's we've gotten. If the previous
-                         * document contains exactly the innerHTML of this first paragraph, it's probably a duplicate.
-                        **/
-                        var firstP = content.getElementsByTagName("P").length ? content.getElementsByTagName("P")[0] : null;
-                        if(firstP && firstP.innerHTML.length > 100) {
-                            for(var i=1; i <= readability.curPageNum; i+=1) {
-                                var rPage = document.getElementById('readability-page-' + i);
-                                if(rPage && rPage.innerHTML.indexOf(firstP.innerHTML) !== -1) {
-                                    dbg('Duplicate of page ' + i + ' - skipping.');
-                                    articlePage.style.display = 'none';
-                                    readability.parsedPages[pageUrl] = true;
-                                    return;
-                                }
-                            }
-                        }
-                        
-                        readability.removeScripts(content);
-
-                        thisPage.innerHTML = thisPage.innerHTML + content.innerHTML;
-
-                        if(nextPageLink) {
-                            readability.appendNextPage(nextPageLink);
-                        }
-                    }
-                });
-            }(nextPageLink, articlePage));
-        },
-        
-        /**
-         * Get an elements class/id weight. Uses regular expressions to tell if this 
-         * element looks good or bad.
-         *
-         * @param Element
-         * @return number (Integer)
-        **/
         getClassWeight: function (e) {
             if(!readability.flagIsActive(readability.FLAG_WEIGHT_CLASSES)) {
                 return 0;
