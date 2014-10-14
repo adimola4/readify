@@ -1,7 +1,7 @@
 env   = ENV['ENV'] || 'development'
 project_root  = ENV['ROOT'] || "/home/deploy/readify/current"
 
-%w{8001 8002}.each do |port|
+%w{ 8001 8002 }.each do |port|
   God.watch do |w|
     w.dir      = project_root
     w.name     = "phantomjs-#{ port }"
@@ -9,7 +9,7 @@ project_root  = ENV['ROOT'] || "/home/deploy/readify/current"
     w.log      = "#{project_root}/log/phantomjs-#{ port }.std.log"
     w.err_log  = "#{project_root}/log/phantomjs-#{ port }.err.log"
     w.env = { 'PORT' => "#{ port }" }
-    w.interval = 30.seconds
+    w.interval = 5
 
     # determine the state on startup
     w.transition(:init, { true => :up, false => :start }) do |on|
@@ -47,6 +47,16 @@ project_root  = ENV['ROOT'] || "/home/deploy/readify/current"
       on.condition(:cpu_usage) do |c|
         c.interval = 10
         c.above = 30.percent
+        c.times = [3, 5]
+      end
+
+      on.condition(:http_response_code) do |c|
+        c.interval = 10
+        c.host = 'localhost'
+        c.port = port
+        c.path = '/test'  
+        c.code_is_not = 200
+        c.timeout = 10.seconds
         c.times = [3, 5]
       end
     end
