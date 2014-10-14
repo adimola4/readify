@@ -9,6 +9,7 @@ project_root  = ENV['ROOT'] || "/home/deploy/readify/current"
     w.log      = "#{project_root}/log/phantomjs-#{ port }.std.log"
     w.err_log  = "#{project_root}/log/phantomjs-#{ port }.err.log"
     w.env = { 'PORT' => "#{ port }" }
+    w.interval = 30.seconds
 
     # determine the state on startup
     w.transition(:init, { true => :up, false => :start }) do |on|

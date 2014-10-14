@@ -1,9 +1,3 @@
-GIT
-  remote: git@github.com:gashaw-mola/phantom-manager.git
-  revision: 85c146dad5e9ec45d3976d46c6d1f0b4dd29b185
-  specs:
-    phantom-manager (0.1.0)
-
 GEM
   remote: https://rubygems.org/
   specs:
@@ -29,4 +23,3 @@ PLATFORMS
 DEPENDENCIES
   capistrano
   god
-  phantom-manager!
