@@ -34,25 +34,48 @@ set :deploy_to, '/home/deploy/readify'
 # Default value for keep_releases is 5
 set :keep_releases, 3
 
+set :rvm_map_bins, %w{gem rake ruby bundle rvmsudo}
+
 namespace :deploy do
+
+  desc 'Start application'
+  task :start do
+    on roles(:app) do
+      within release_path do
+        execute "rvmsudo", "ENV=#{ fetch(:env) } god -c #{ current_path}/config/god/readify.rb"
+      end
+    end
+  end
+
+  desc 'Stop application'
+  task :stop do
+    on roles(:app) do
+      within release_path do
+        execute "rvmsudo", "god terminate"
+      end
+    end
+  end
 
   desc 'Restart application'
   task :restart do
-    on roles(:app), in: :sequence, wait: 5 do
-      # Your restart mechanism here, for example:
-      # execute :touch, release_path.join('tmp/restart.txt')
+    on roles(:app), in: :sequence do
+      within release_path do
+        %w{ 8001 8002 }.each do |port|
+          execute "rvmsudo", "god restart phantomjs-#{ port }"
+        end
+        execute "rvmsudo", "god restart nginx"
+      end
+    end
+  end
+
+  desc 'Hard Restart application'
+  task :hard_restart do
+    on roles(:app), in: :sequence do
+      stop
+      start
     end
   end
 
   after :publishing, :restart
-
-  after :restart, :clear_cache do
-    on roles(:web), in: :groups, limit: 3, wait: 10 do
-      # Here we can do anything such as:
-      # within release_path do
-      #   execute :rake, 'cache:clear'
-      # end
-    end
-  end
 
 end

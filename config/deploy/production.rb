@@ -6,6 +6,8 @@
 
 role :app, %w{deploy@104.131.21.52}
 
+set :env, 'production'
+
 
 # Extended Server Syntax
 # ======================

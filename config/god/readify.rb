@@ -7,7 +7,6 @@ project_root  = ENV['ROOT'] || "/home/deploy/readify/current"
     w.name     = "phantomjs-#{ port }"
     w.start    = "phantomjs server.js"
     w.log      = "#{project_root}/log/phantomjs-#{ port }.std.log"
-    w.err_log  = "#{project_root}/log/phantomjs-#{ port }.err.log"
     w.env = { 'PORT' => "#{ port }" }
     w.interval = 5
 
@@ -67,8 +66,9 @@ end
 God.watch do |w|
   w.name = "nginx"
   w.interval = 30.seconds
-  w.start = "nginx -c #{ project_root }/config/nginx/#{ env }.conf"
-  w.stop = "nginx -s stop"
+  w.start = "sudo nginx -c #{ project_root }/config/nginx/#{ env }.conf"
+  w.stop = "sudo nginx -s stop"
+  w.restart = "sudo nginx -s reload"
   w.start_grace = 20.seconds
   w.pid_file = "/run/nginx.pid"
     
