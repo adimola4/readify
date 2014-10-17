@@ -36,6 +36,12 @@ set :keep_releases, 3
 
 set :rvm_map_bins, %w{gem rake ruby bundle rvmsudo}
 
+set :bundle_flags, "--quiet"
+
+set :bundle_binstubs, nil
+
+set :bundle_path, nil
+
 namespace :deploy do
 
   desc 'Start application'
