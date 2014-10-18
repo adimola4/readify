@@ -66,9 +66,9 @@ var readify = function (){
             var articleTitle   = readability.getArticleTitle();
             var articleContent = readability.grabArticle();
             var articleCoverImage = articleContent && readability.getBestImage(articleContent, true);
-            if(!articleCoverImage){
+            if(articleContent && !articleCoverImage){
               articleCoverImage = readability.getBestImage(document.body);
-              articleContent.insertBefore(articleCoverImage, articleContent.firstChild);
+              articleCoverImage && articleContent.insertBefore(articleCoverImage, articleContent.firstChild);
             }
 
             setTimeout(function(){
