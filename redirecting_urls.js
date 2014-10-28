@@ -1,4 +1,4 @@
 module.exports = [
-  /t.co/i,
-  /bit.ly/i
+  /^https?:\/\/t.co/i,
+  /^https?:\/\/bit.ly/i
 ];

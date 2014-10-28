@@ -5,7 +5,7 @@ project_root  = ENV['ROOT'] || "/home/deploy/readify/current"
   God.watch do |w|
     w.dir      = project_root
     w.name     = "phantomjs-#{ port }"
-    w.start    = "phantomjs server.js"
+    w.start    = "phantomjs --ssl-protocol=any server.js"
     w.log      = "#{project_root}/log/phantomjs-#{ port }.std.log"
     w.env = { 'PORT' => "#{ port }" }
     w.interval = 5
