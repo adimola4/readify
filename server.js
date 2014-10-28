@@ -4,22 +4,9 @@ var system    = require("system"),
 
 var config     = require("./config.js"),
     readify = require('./readify'),
+    redirectingUrls = require('./redirecting_urls'),
+    rewriteUrls = require('./rewrite_urls'),
     benchmark = require('./benchmark');
-
-if (!config.port) {
-  console.error("No port specified in config.js");
-  phantom.exit(1);
-}
-
-var server    = webserver.create();
-var port = Number(system.env.PORT || system.args[1]) || config.port;
-var listening = server.listen(port, onRequest);
-
-if (!listening) {
-  console.error("Could not bind to port " + port);
-  phantom.exit(1);
-}
-console.log("Listening on port " + port);
 
 function onRequest(req, res) {
   var page          = webpage.create(),
@@ -44,57 +31,88 @@ function onRequest(req, res) {
     return send(400, toHTML("`href` parameter is missing."));
   }
 
-  page.settings.loadImages = config.loadImages;
-
-  page.onInitialized = function() {
-
-    page.evaluate(onInit, config.readyEvent);
-
-    function onInit(readyEvent) {
-      window.addEventListener(readyEvent, function() {
-        setTimeout(window.callPhantom, 0);
-      })
-    }
+  var maxTime = config.maxTime;
+  if(isUrlRedirecting(href)){
+    maxTime = 2*maxTime;
   }
-
-  page.onResourceRequested = function(requestData, networkRequest){
-    if(page.url != 'about:blank' && !/(\.css|\.js|\.png|\.gif|\.jpe?g)(\?.*)?$/.test(requestData.url)){
-       var i, l, curItem, abort = true;
-       for(i = 0, l = requestData.headers.length; i < l; ++i){
-         curItem = requestData.headers[i];
-         if(curItem.name.toLowerCase() == 'x-requested-with' && curItem.value.toLowerCase() == 'xmlhttprequest'){
-           abort = false;
-           break;
-         }
-       }
-       if(abort){
-        networkRequest.abort();
-        //console.log('aborted request : ' + requestData.url );
-       }
-    }
-  }
-
-  page.onCallback = function() {
-    send(200, JSON.stringify(out), true);
-  }
-
-  page.onConsoleMessage = function(msg) {
-    if((/^(Readability|Benchmark)/).test(msg)){
-      console.log('page: ' + msg);
-    }
-  };
-
   var timeout = setTimeout(function(){
-    console.log("page readify timeout (" + config.maxTime + "ms)");
+    console.log("page readify timeout (" + maxTime + "ms)");
     send(502, toHTML("page readify timeout"));
-  }, config.maxTime);
+  }, maxTime);
 
-  var out, startedAt = new Date;
-  page.open(href, function(status){
-    console.log("Benchmark - url open: " + ( (new Date).getTime() - startedAt.getTime() ) + "ms");
-    page.injectJs('benchmark.js');
-    out = page.evaluate(readify);
-  });
+  var configPage = function(page){
+
+    page.settings.userAgent = "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36";
+
+    page.onInitialized = function() {
+
+      page.evaluate(onInit, config.readyEvent);
+
+      function onInit(readyEvent) {
+        window.addEventListener(readyEvent, function() {
+          setTimeout(window.callPhantom, 0);
+        })
+      }
+    }
+
+    page.onResourceRequested = function(requestData, networkRequest){
+      if(page.url != 'about:blank' && !/(\.css|\.js|\.png|\.gif|\.jpe?g)(\?.*)?$/.test(requestData.url)){
+         var i, l, curItem, abort = true;
+         for(i = 0, l = requestData.headers.length; i < l; ++i){
+           curItem = requestData.headers[i];
+           if(curItem.name.toLowerCase() == 'x-requested-with' && curItem.value.toLowerCase() == 'xmlhttprequest'){
+             abort = false;
+             break;
+           }
+         }
+         if(abort){
+          networkRequest.abort();
+         }
+      }
+    }
+
+    page.onCallback = function() {
+      send(200, JSON.stringify(out), true);
+    }
+
+    page.onConsoleMessage = function(msg) {
+      if((/^(Readability|Benchmark)/).test(msg)){
+        console.log('page: ' + msg);
+      }
+    };
+
+    page.onNavigationRequested = function(url, type, willNavigate, main){
+      var openNewPage = function(newUrl){
+        console.log("navigating... : " + page.url + " > " + newUrl);
+        page.close();
+        openPageAndReadify(newUrl);
+      }
+      console.log("nav req: " + page.url + " > " + url);
+      var rewritedUrl = findRewriteUrl(url);
+      if(rewritedUrl){
+        openNewPage(rewritedUrl);
+      } else if (page.url != 'about:blank' && page.url != url && main){
+        openNewPage(url);
+      }
+    }
+  }
+
+  var out;
+
+  var openPageAndReadify = function(url){
+    var page = webpage.create();
+    configPage(page);
+    var startedAt = new Date;
+    page.open(url, function(status){
+      console.log("Benchmark - " + page.url + " open: " + ( (new Date).getTime() - startedAt.getTime() ) + "ms");
+      if(!isUrlRedirecting(page.url)){
+        page.injectJs('benchmark.js');
+        out = page.evaluate(readify);
+      }
+    });
+  }
+
+  openPageAndReadify(href);
 
   function send(statusCode, data, isJson) {
     if(!requestServed){
@@ -120,6 +138,29 @@ function onRequest(req, res) {
   }
 }
 
+function isUrlRedirecting(url){
+  var i, l, matching = false;
+  for(i = 0, l = redirectingUrls.length; i < l; ++i){
+    if(redirectingUrls[i].test(url)){
+      matching = true;
+      break;
+    }
+  }
+  return matching;
+}
+
+function findRewriteUrl(url){
+  var i, l, match = null, newUrl = null;
+  for(i = 0, l = rewriteUrls.length; i < l; ++i){
+    match = rewriteUrls[i].exec(url);
+    if(match){
+      newUrl = match[1];
+      break;
+    }
+  }
+  return newUrl;
+}
+
 function byteLength(str) {
   return encodeURIComponent(str).match(/%..|./g).length;
 }
@@ -141,3 +182,18 @@ function parse(url) {
 
   return anchor;
 }
+
+if (!config.port) {
+  console.error("No port specified in config.js");
+  phantom.exit(1);
+}
+
+var server    = webserver.create();
+var port = Number(system.env.PORT || system.args[1]) || config.port;
+var listening = server.listen(port, onRequest);
+
+if (!listening) {
+  console.error("Could not bind to port " + port);
+  phantom.exit(1);
+}
+console.log("Listening on port " + port);
