@@ -31,7 +31,7 @@ function onRequest(req, res) {
     return send(400, toHTML("`href` parameter is missing."));
   }
 
-  var maxTime = config.maxTime;
+  var maxTime = 10000//config.maxTime;
   if(isUrlRedirecting(href)){
     maxTime = 2*maxTime;
   }
@@ -42,7 +42,14 @@ function onRequest(req, res) {
 
   var configPage = function(page){
 
+    var iframeUrls = [];
+
     page.settings.userAgent = "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36";
+
+    page.viewportSize = {
+      width: 1920,
+      height: 1080
+    }
 
     page.onInitialized = function() {
 
@@ -57,15 +64,9 @@ function onRequest(req, res) {
 
     page.onResourceRequested = function(requestData, networkRequest){
       if(page.url != 'about:blank' && !/(\.css|\.js|\.png|\.gif|\.jpe?g)(\?.*)?$/.test(requestData.url)){
-         var i, l, curItem, abort = true;
-         for(i = 0, l = requestData.headers.length; i < l; ++i){
-           curItem = requestData.headers[i];
-           if(curItem.name.toLowerCase() == 'x-requested-with' && curItem.value.toLowerCase() == 'xmlhttprequest'){
-             abort = false;
-             break;
-           }
-         }
-         if(abort){
+         var index = iframeUrls.indexOf(requestData.url);
+         if(index != -1){
+          // console.log("aborting: "+ requestData.url.substring(0, 256));
           networkRequest.abort();
          }
       }
@@ -76,7 +77,7 @@ function onRequest(req, res) {
     }
 
     page.onConsoleMessage = function(msg) {
-      if((/^(Readability|Benchmark)/).test(msg)){
+      if((/^(Readify|Benchmark)/).test(msg)){
         console.log('page: ' + msg);
       }
     };
@@ -87,12 +88,15 @@ function onRequest(req, res) {
         page.close();
         openPageAndReadify(newUrl);
       }
-      console.log("nav req: " + page.url + " > " + url);
+      // console.log("nav req: " + page.url + " > " + url);
       var rewritedUrl = findRewriteUrl(url);
       if(rewritedUrl){
         openNewPage(rewritedUrl);
-      } else if (page.url != 'about:blank' && page.url != url && main){
+      } else if (page.url != 'about:blank' && page.url != "" && page.url != url && main){
         openNewPage(url);
+      }
+      if(!main){
+        iframeUrls.push(url);
       }
     }
   }
@@ -106,6 +110,7 @@ function onRequest(req, res) {
     page.open(url, function(status){
       console.log("Benchmark - " + page.url + " open: " + ( (new Date).getTime() - startedAt.getTime() ) + "ms");
       if(!isUrlRedirecting(page.url)){
+        page.render("webpage.png");
         page.injectJs('benchmark.js');
         out = page.evaluate(readify);
       }
