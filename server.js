@@ -6,6 +6,7 @@ var config     = require("./config.js"),
     readify = require('./readify'),
     redirectingUrls = require('./redirecting_urls'),
     rewriteUrls = require('./rewrite_urls'),
+    xhrMarker = require('./xhr_marker'),
     benchmark = require('./benchmark');
 
 function onRequest(req, res) {
@@ -31,7 +32,7 @@ function onRequest(req, res) {
     return send(400, toHTML("`href` parameter is missing."));
   }
 
-  var maxTime = 10000//config.maxTime;
+  var maxTime = config.maxTime;
   if(isUrlRedirecting(href)){
     maxTime = 2*maxTime;
   }
@@ -42,31 +43,29 @@ function onRequest(req, res) {
 
   var configPage = function(page){
 
-    var iframeUrls = [];
-
-    page.settings.userAgent = "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36";
+    page.settings.userAgent = "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.2049.0 Safari/537.36";
 
     page.viewportSize = {
       width: 1920,
       height: 1080
     }
 
-    page.onInitialized = function() {
-
-      page.evaluate(onInit, config.readyEvent);
-
-      function onInit(readyEvent) {
-        window.addEventListener(readyEvent, function() {
-          setTimeout(window.callPhantom, 0);
-        })
-      }
+    page.onInitialized = function(){
+      page.evaluate(xhrMarker);
     }
 
     page.onResourceRequested = function(requestData, networkRequest){
-      if(page.url != 'about:blank' && !/(\.css|\.js|\.png|\.gif|\.jpe?g)(\?.*)?$/.test(requestData.url)){
-         var index = iframeUrls.indexOf(requestData.url);
-         if(index != -1){
-          // console.log("aborting: "+ requestData.url.substring(0, 256));
+      if(page.url != 'about:blank' && !/(\.css|\.js|\.png|\.gif|\.jpe?g)/.test(requestData.url)){
+         var i, l, curItem, abort = true;
+         for(i = 0, l = requestData.headers.length; i < l; ++i){
+           curItem = requestData.headers[i];
+           if(curItem.name.toLowerCase() == 'x-requested-with' && curItem.value.toLowerCase() == 'xmlhttprequest'){
+             console.log("xhr: "+ requestData.url);
+             abort = false;
+             break;
+           }
+         }
+         if(abort){
           networkRequest.abort();
          }
       }
@@ -85,19 +84,26 @@ function onRequest(req, res) {
     page.onNavigationRequested = function(url, type, willNavigate, main){
       var openNewPage = function(newUrl){
         console.log("navigating... : " + page.url + " > " + newUrl);
+        page.readifyClosing = true;
+        page.stop();
         page.close();
         openPageAndReadify(newUrl);
       }
       // console.log("nav req: " + page.url + " > " + url);
       var rewritedUrl = findRewriteUrl(url);
+      
       if(rewritedUrl){
         openNewPage(rewritedUrl);
       } else if (page.url != 'about:blank' && page.url != "" && page.url != url && main){
         openNewPage(url);
       }
-      if(!main){
-        iframeUrls.push(url);
-      }
+    }
+
+    page.onError = function (msg, trace) {
+        // console.log(msg);
+        // trace.forEach(function(item) {
+        //     console.log('  ', item.file, ':', item.line);
+        // });
     }
   }
 
@@ -113,6 +119,7 @@ function onRequest(req, res) {
         page.render("webpage.png");
         page.injectJs('benchmark.js');
         out = page.evaluate(readify);
+        page.onCallback();
       }
     });
   }
@@ -134,7 +141,7 @@ function onRequest(req, res) {
       res.write(data);
       res.close();
       res = null;
-
+      page.stop();
       page.close();
       page = null;
 

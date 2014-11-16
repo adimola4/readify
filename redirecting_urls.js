@@ -1,5 +1,6 @@
 module.exports = [
-  /^https?:\/\/t.co/i,
-  /^https?:\/\/bit.ly/i,
-  /^https?:\/\/traffic\.outbrain\.com\/network\/redir/
+  /^https?:\/\/t\.co/i,
+  /^https?:\/\/bit\.ly/i,
+  /^https?:\/\/hsrd\.yahoo\.com/,
+  /^https?:\/\/www\.forbes\.com\/fdc\/welcome_mjx\.shtml/
 ];

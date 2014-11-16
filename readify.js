@@ -65,12 +65,6 @@ var readify = function (){
       }
     }
 
-    setTimeout(function(){
-      var readyEvent = document.createEvent("Event");
-      readyEvent.initEvent("IamReadable", true, true);
-      window.dispatchEvent(readyEvent);
-    }, 1);
-
     return content && { title: articleTitle, content: content, url: location.href };
   }
 
