@@ -9,6 +9,14 @@ var config     = require("./config.js"),
     xhrMarker = require('./xhr_marker'),
     benchmark = require('./benchmark');
 
+var verbose = config.verbose;
+
+var dbg = function(msg){
+  if(verbose){
+    console.log(msg);
+  }
+}
+
 function onRequest(req, res) {
   var page          = webpage.create(),
       requestServed = false;
@@ -34,21 +42,18 @@ function onRequest(req, res) {
 
   var maxTime = config.maxTime;
   if(isUrlRedirecting(href)){
-    maxTime = 2*maxTime;
+    maxTime = 1.5*maxTime;
   }
   var timeout = setTimeout(function(){
     console.log("page readify timeout (" + maxTime + "ms)");
-    send(502, toHTML("page readify timeout"));
+    send(504, toHTML("page readify timeout"));
   }, maxTime);
 
   var configPage = function(page){
 
-    page.settings.userAgent = "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.2049.0 Safari/537.36";
+    var xhrUrls = [];
 
-    page.viewportSize = {
-      width: 1920,
-      height: 1080
-    }
+    page.settings.userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/38.0.2125.111 Safari/537.36";
 
     page.onInitialized = function(){
       page.evaluate(xhrMarker);
@@ -56,40 +61,41 @@ function onRequest(req, res) {
 
     page.onResourceRequested = function(requestData, networkRequest){
       if(page.url != 'about:blank' && !/(\.css|\.js|\.png|\.gif|\.jpe?g)/.test(requestData.url)){
-         var i, l, curItem, abort = true;
-         for(i = 0, l = requestData.headers.length; i < l; ++i){
-           curItem = requestData.headers[i];
-           if(curItem.name.toLowerCase() == 'x-requested-with' && curItem.value.toLowerCase() == 'xmlhttprequest'){
-             console.log("xhr: "+ requestData.url);
-             abort = false;
-             break;
-           }
+         var abort = true;
+         if(xhrUrls.indexOf(requestData.url) != -1){
+           dbg("xhr: "+ requestData.url);
+           abort = false;
          }
          if(abort){
+          dbg("aborting: " + requestData.url.substring(0, 256));
           networkRequest.abort();
          }
       }
     }
 
-    page.onCallback = function() {
-      send(200, JSON.stringify(out), true);
+    page.onCallback = function(data) {
+      switch(data.action){
+        case "addXhrUrl":
+          xhrUrls.push(data.url);
+          break;
+      }
     }
 
     page.onConsoleMessage = function(msg) {
       if((/^(Readify|Benchmark)/).test(msg)){
-        console.log('page: ' + msg);
+        dbg('page: ' + msg);
       }
     };
 
     page.onNavigationRequested = function(url, type, willNavigate, main){
       var openNewPage = function(newUrl){
-        console.log("navigating... : " + page.url + " > " + newUrl);
+        dbg("navigating... : " + page.url + " > " + newUrl);
         page.readifyClosing = true;
         page.stop();
         page.close();
         openPageAndReadify(newUrl);
       }
-      // console.log("nav req: " + page.url + " > " + url);
+      dbg("nav req: " + page.url + " > " + url);
       var rewritedUrl = findRewriteUrl(url);
       
       if(rewritedUrl){
@@ -100,10 +106,10 @@ function onRequest(req, res) {
     }
 
     page.onError = function (msg, trace) {
-        // console.log(msg);
-        // trace.forEach(function(item) {
-        //     console.log('  ', item.file, ':', item.line);
-        // });
+        dbg(msg);
+        trace.forEach(function(item) {
+          dbg('  ', item.file, ':', item.line);
+        });
     }
   }
 
@@ -119,7 +125,7 @@ function onRequest(req, res) {
         page.render("webpage.png");
         page.injectJs('benchmark.js');
         out = page.evaluate(readify);
-        page.onCallback();
+        send(200, JSON.stringify(out), true);
       }
     });
   }
