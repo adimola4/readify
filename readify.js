@@ -24,15 +24,15 @@ var readify = function (){
       var sibling, topCandidateSiblings = Array.prototype.slice.call(topCandidate.parentNode.children);
       for(i = topCandidateSiblings.length - 1; i >= 0 ; --i){
         sibling = topCandidateSiblings[i];
-        if(sibling === topCandidate || (sibling.readify && (sibling.readify.score >= 3))){
+        if(sibling === topCandidate || getAggragatedScore(sibling) >= 3){
           articleContents.unshift(sibling);
-          (sibling != topCandidate) && dbg("Added sibling "+ eToS(sibling) + ", with score " + sibling.readify.score);
+          (sibling != topCandidate) && dbg("Added sibling "+ eToS(sibling));
         }
       }
       var boundLookupRect = topCandidate.parentNode.getBoundingClientRect(), curMediaRect, medias = videos.concat(goodImages), additionalMedia = null;
       for(i = medias.length - 1; i >= 0; --i){
         curMediaRect = medias[i].getBoundingClientRect();
-        if((curMediaRect.bottom <= boundLookupRect.top) && 
+        if((curMediaRect.bottom <= boundLookupRect.top) && (curMediaRect.width >= 0.5 * boundLookupRect.width) &&
            ((curMediaRect.left >= boundLookupRect.left && curMediaRect.right <= boundLookupRect.right) ||
             (curMediaRect.left <= boundLookupRect.left && curMediaRect.right >= boundLookupRect.right))){
           additionalMedia = medias[i];
@@ -40,14 +40,14 @@ var readify = function (){
         }
       }
 
+      articleTitle = extractTitle();
+
+      removeNoneContent(articleContents, topCandidate);
+
       if(additionalMedia){
         articleContents.unshift(additionalMedia);
         dbg("additional media: " + eToS(additionalMedia));
       }
-
-      articleTitle = extractTitle();
-
-      removeNoneContent(articleContents, topCandidate);
       
       for(i = articleContents.length - 1; i >= 0; --i){
         cleanNode(articleContents[i]);
@@ -230,6 +230,18 @@ var readify = function (){
     var style = getComputedStyle(node);
     return  style.getPropertyValue("display").toLowerCase() != 'none' &&
             style.getPropertyValue("visibility").toLowerCase() != 'hidden';//opacity
+  }
+
+  var getAggragatedScore = function(node){
+    var score = 0, children = node.children;
+    if(children.length){
+      for(var i = children.length - 1; i >= 0; --i){
+        score += getAggragatedScore(children[i]);
+      }
+    } else {
+      score += (node.readify && node.readify.score) || 0;
+    }
+    return score;
   }
 
   var removeNode = function(node){
