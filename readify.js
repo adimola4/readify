@@ -4,11 +4,16 @@ var readify = function (){
     console.log("Readify: " + msg);
   }
 
+  var eToS = function(elem){
+    return "" + elem.nodeName + ((elem.id && ("#" + elem.id)) || (elem.className && ("." + elem.className)));
+  }
+
   var extract = function(){
 
     var i;
 
     var rating = rateContent();
+    dbg("topCandidate: " + (rating.topCandidate && eToS(rating.topCandidate)));
 
     var topCandidate = rating.topCandidate,
         videos = rating.videos,
@@ -21,6 +26,7 @@ var readify = function (){
         sibling = topCandidateSiblings[i];
         if(sibling === topCandidate || (sibling.readify && (sibling.readify.score >= 3))){
           articleContents.unshift(sibling);
+          (sibling != topCandidate) && dbg("Added sibling "+ eToS(sibling) + ", with score " + sibling.readify.score);
         }
       }
       var boundLookupRect = topCandidate.parentNode.getBoundingClientRect(), curMediaRect, medias = videos.concat(goodImages), additionalMedia = null;
@@ -36,6 +42,7 @@ var readify = function (){
 
       if(additionalMedia){
         articleContents.unshift(additionalMedia);
+        dbg("additional media: " + eToS(additionalMedia));
       }
 
       articleTitle = extractTitle();
@@ -53,6 +60,7 @@ var readify = function (){
       var ogVideo = getOgVideo();
       if(ogVideo){
         articleContents.unshift(ogVideo);
+        dbg("og video: " + eToS(ogVideo));
       }
     }
 
