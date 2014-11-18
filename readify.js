@@ -32,7 +32,7 @@ var readify = function (){
       var boundLookupRect = topCandidate.parentNode.getBoundingClientRect(), curMediaRect, medias = videos.concat(goodImages), additionalMedia = null;
       for(i = medias.length - 1; i >= 0; --i){
         curMediaRect = medias[i].getBoundingClientRect();
-        if((curMediaRect.bottom <= boundLookupRect.top) && (curMediaRect.width >= 0.5 * boundLookupRect.width) &&
+        if((curMediaRect.bottom <= boundLookupRect.top) && (curMediaRect.width > 0.5 * boundLookupRect.width) &&
            ((curMediaRect.left >= boundLookupRect.left && curMediaRect.right <= boundLookupRect.right) ||
             (curMediaRect.left <= boundLookupRect.left && curMediaRect.right >= boundLookupRect.right))){
           additionalMedia = medias[i];
@@ -40,14 +40,14 @@ var readify = function (){
         }
       }
 
-      articleTitle = extractTitle();
-
-      removeNoneContent(articleContents, topCandidate);
-
       if(additionalMedia){
         articleContents.unshift(additionalMedia);
         dbg("additional media: " + eToS(additionalMedia));
       }
+
+      articleTitle = extractTitle();
+
+      removeNoneContent(articleContents, topCandidate);
       
       for(i = articleContents.length - 1; i >= 0; --i){
         cleanNode(articleContents[i]);
@@ -199,7 +199,7 @@ var readify = function (){
 
   var getWordCount = function(str){
     var matches = str.match(/\S+/g);
-    return matches && (matches.length - 1) || 0;
+    return matches && matches.length || 0;
   }
 
   var getLinkDensity = function(node){
@@ -228,8 +228,10 @@ var readify = function (){
 
   var nodeIsVisible = function(node){
     var style = getComputedStyle(node);
+    var rect = node.getBoundingClientRect(node);
     return  style.getPropertyValue("display").toLowerCase() != 'none' &&
-            style.getPropertyValue("visibility").toLowerCase() != 'hidden';//opacity
+            style.getPropertyValue("visibility").toLowerCase() != 'hidden' &&
+            ((node.childNodes.length > 0 && style.getPropertyValue("overflow") != "hidden") || (rect.width > 1 && rect.height > 1));
   }
 
   var getAggragatedScore = function(node){
@@ -286,32 +288,53 @@ var readify = function (){
     }
   }
 
+  var compEnv = function(node, predicate, defB){
+    var previous = node.previousElementSibling,
+        prevPrevious = previous && previous.previousElementSibling,
+        next = node.nextElementSibling,
+        nextNext = next && next.nextElementSibling;
+    if(previous && next){
+      return predicate(node, previous, next);
+    } else if(previous && prevPrevious){
+      return predicate(node, previous, prevPrevious);
+    } else if(next && nextNext){
+      return predicate(node, next, nextNext);
+    } else {
+      return !!defB;
+    }
+  }
+
   var isFontSizeSmaller = function(node){
-    var previous = node.previousElementSibling;
-    if(previous){
-      var prePrevious = previous.previousElementSibling;
-      if(prePrevious){
-        var curFontSize = parseFloat(getComputedStyle(node).getPropertyValue("font-size"));
-        var previousFontSize = parseFloat(getComputedStyle(previous).getPropertyValue("font-size"));
-        var prePreviousFontSize = parseFloat(getComputedStyle(prePrevious).getPropertyValue("font-size"));
-        if(curFontSize < prePreviousFontSize && curFontSize < previousFontSize){
-          return true;
-        }
-      }
-    }
-    var next = node.nextElementSibling;
-    if(next){
-      var nextNext = next.nextElementSibling;
-      if(nextNext){
-        var curFontSize = parseFloat(getComputedStyle(node).getPropertyValue("font-size"));
-        var nextFontSize = parseFloat(getComputedStyle(next).getPropertyValue("font-size"));
-        var nextNextFontSize = parseFloat(getComputedStyle(nextNext).getPropertyValue("font-size"));
-        if(curFontSize < nextNextFontSize && curFontSize < nextFontSize){
-          return true;
-        }
-      }
-    }
-    return false;
+    return compEnv(node, function(n, a, b){
+      var nFontSize = parseFloat(getComputedStyle(n).getPropertyValue("font-size"));
+      var aFontSize = parseFloat(getComputedStyle(a).getPropertyValue("font-size"));
+      var bFontSize = parseFloat(getComputedStyle(b).getPropertyValue("font-size"));
+      return nFontSize < aFontSize && nFontSize < bFontSize;
+    });
+  }
+
+  var nodeIsPositioned = function(node){
+    return compEnv(node, function(n, a, b){
+      var nPosition = getComputedStyle(n).getPropertyValue("position");
+      var aPosition = getComputedStyle(a).getPropertyValue("position");
+      var bPosition = getComputedStyle(b).getPropertyValue("position");
+      return nPosition == "absolute" && (aPosition != "absolute" || bPosition != "absolute");
+    });
+  }
+
+  var nodeIsFloating = function(node){
+    return compEnv(node, function(n, a, b){
+      var nFloat = getComputedStyle(n).getPropertyValue("float");
+      var aFloat = getComputedStyle(a).getPropertyValue("float");
+      var bFloat = getComputedStyle(b).getPropertyValue("float");
+      return nFloat != "none" && (aFloat == "none" || bFloat == "none");
+    });
+  }
+
+  var nodeHasLargerTagDensity = function(node){
+    return compEnv(node, function(n, a, b){
+      return getTagDensity(n) > 1 && (getTagDensity(a) < 1 || getTagDensity(b) < 1);
+    });
   }
 
   var isVideoUrl = function(url){
@@ -365,9 +388,31 @@ var readify = function (){
     }
   }
 
+  var nodeHasGoodMedia = function(node){
+    var iframes = node.getElementsByTagName('iframe'), images = node.getElementsByTagName('img');
+    for(var i = iframes.length - 1; i >=0; --i){
+      if(iframes[i].isVideo){
+        return true;
+      }
+    }
+    for(i = images.length - 1; i>= 0; --i){
+      if(images[i].isGoodImage){
+        return true;
+      }
+    }
+    return false;
+  }
+
+  var markNoneContent = function(node, noneContentList, reason){
+    dbg("none content: " + eToS(node) + " reason: " + reason);
+    noneContentList.push(node);
+  };
+
   var grabNoneContent = function(node, noneContentList){
-    var tagName = node.nodeName.toLowerCase();
+    var linkDensity, tagName = node.nodeName.toLowerCase();
     switch(tagName){
+      case "br":
+        return;
       case "style":
       case "script":
       case "link":
@@ -402,14 +447,13 @@ var readify = function (){
       case "map":
       case "area":
       case "wbr":
-      case "header":
-        return noneContentList.push(node);
+        return markNoneContent(node, noneContentList, "none content element");
       case "img":
       case "iframe":
         if(node.isGoodImage || node.isVideo){
           return;
         } else {
-          return noneContentList.push(node);
+          return markNoneContent(node, noneContentList, "bad img/iframe");
         }
       case "embed":
       case "object":
@@ -420,7 +464,7 @@ var readify = function (){
       case "track":
       case "svg":
       case "math":
-        return noneContentList.push(node);
+        return markNoneContent(node, noneContentList, "none content element(*)");//maybe support in the future
       case "table":
       case "caption":
       case "colgroup":
@@ -431,7 +475,6 @@ var readify = function (){
       case "tr":
       case "td":
       case "th":
-      case "a":
       case "h2":
       case "h3":
       case "h4":
@@ -467,11 +510,27 @@ var readify = function (){
         if(nodeIsVisible(node)){
          break;
         } else {
-         return noneContentList.push(node);
+         return markNoneContent(node, noneContentList, "invisible inline element");
+        }
+      case "a":
+        if(nodeIsVisible(node) && node.getAttribute('href') && node.getAttribute('href').indexOf("#") != 0 ){
+          break;
+        } else {
+          return markNoneContent(node, noneContentList, "invisible link or src=#");
         }
       default:
-        if(!nodeIsVisible(node) || getLinkDensity(node) > 0.333333 ){
-          return noneContentList.push(node);
+        if(!nodeIsVisible(node)){
+          return markNoneContent(node, noneContentList, "invisible element");
+        } else if(!nodeHasGoodMedia(node)) {
+          if(nodeIsPositioned(node)){
+            return markNoneContent(node, noneContentList, "element is positioned");
+          } else if(nodeIsFloating(node)){
+            return markNoneContent(node, noneContentList, "element is floating");
+          } else if(isFontSizeSmaller(node)){
+            return markNoneContent(node, noneContentList, "element font size is smaller");
+          } else if(nodeHasLargerTagDensity(node)){
+            return markNoneContent(node, noneContentList, "element has larger tag density");
+          }
         }
     }
 
