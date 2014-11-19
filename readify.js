@@ -9,7 +9,7 @@ var readify = function (){
   }
 
   var extract = function(){
-
+    
     var i;
 
     var rating = rateContent();
@@ -82,7 +82,7 @@ var readify = function (){
     var nodesToScore = document.querySelectorAll("p, div, pre, section, article, blockquote, li, td, span, font, img, iframe");
     var candidates = [];
 
-    var curNode, parentNode, grandParentNode, grand2ParentNode, score, tagName, goodImages = [], videos = [];
+    var curNode, parentNode, grandParentNode, score, tagName, goodImages = [], videos = [];
     for(i = nodesToScore.length - 1; i >= 0; --i ){
       
       curNode = nodesToScore[i];
@@ -108,10 +108,6 @@ var readify = function (){
       grandParentNode = parentNode !== document.body ? parentNode.parentNode : null;
       if(grandParentNode){
         initNode(grandParentNode);
-        grand2ParentNode = grandParentNode.parentNode;
-        if(grand2ParentNode){
-          initNode(grand2ParentNode);
-        }
       }
 
       score = 0;
@@ -133,9 +129,6 @@ var readify = function (){
       if(grandParentNode){
         grandParentNode.readify.score += score/3;
         candidates.push(grandParentNode);
-        if(grand2ParentNode){
-          grand2ParentNode.readify.score += score/4;
-        }
       }
 
     }
@@ -288,7 +281,7 @@ var readify = function (){
     }
   }
 
-  var compEnv = function(node, predicate, defB){
+  var compEnv = function(node, predicate){
     var previous = node.previousElementSibling,
         prevPrevious = previous && previous.previousElementSibling,
         next = node.nextElementSibling,
@@ -300,40 +293,44 @@ var readify = function (){
     } else if(next && nextNext){
       return predicate(node, next, nextNext);
     } else {
-      return !!defB;
+      return predicate(node, previous, next);
     }
   }
 
   var isFontSizeSmaller = function(node){
     return compEnv(node, function(n, a, b){
-      var nFontSize = parseFloat(getComputedStyle(n).getPropertyValue("font-size"));
-      var aFontSize = parseFloat(getComputedStyle(a).getPropertyValue("font-size"));
-      var bFontSize = parseFloat(getComputedStyle(b).getPropertyValue("font-size"));
-      return nFontSize < aFontSize && nFontSize < bFontSize;
+      if(a && b){
+        var nFontSize = parseFloat(getComputedStyle(n).getPropertyValue("font-size"));
+        var aFontSize = parseFloat(getComputedStyle(a).getPropertyValue("font-size"));
+        var bFontSize = parseFloat(getComputedStyle(b).getPropertyValue("font-size"));
+        return nFontSize < aFontSize && nFontSize < bFontSize;
+      } else {
+        return false;
+      }
     });
   }
 
   var nodeIsPositioned = function(node){
     return compEnv(node, function(n, a, b){
-      var nPosition = getComputedStyle(n).getPropertyValue("position");
-      var aPosition = getComputedStyle(a).getPropertyValue("position");
-      var bPosition = getComputedStyle(b).getPropertyValue("position");
-      return nPosition == "absolute" && (aPosition != "absolute" || bPosition != "absolute");
+      var nPosition = getComputedStyle(n).getPropertyValue("position") == "absolute";
+      var aPosition = a && getComputedStyle(a).getPropertyValue("position") == "absolute";
+      var bPosition = b && getComputedStyle(b).getPropertyValue("position") == "absolute";
+      return nPosition && !(aPosition && bPosition );
     });
   }
 
   var nodeIsFloating = function(node){
     return compEnv(node, function(n, a, b){
-      var nFloat = getComputedStyle(n).getPropertyValue("float");
-      var aFloat = getComputedStyle(a).getPropertyValue("float");
-      var bFloat = getComputedStyle(b).getPropertyValue("float");
-      return nFloat != "none" && (aFloat == "none" || bFloat == "none");
+      var nFloat = getComputedStyle(n).getPropertyValue("float") != "none";
+      var aFloat = a && getComputedStyle(a).getPropertyValue("float") != "none";
+      var bFloat = b && getComputedStyle(b).getPropertyValue("float") != "none";
+      return nFloat && !(aFloat && bFloat);
     });
   }
 
   var nodeHasLargerTagDensity = function(node){
     return compEnv(node, function(n, a, b){
-      return getTagDensity(n) > 1 && (getTagDensity(a) < 1 || getTagDensity(b) < 1);
+      return getTagDensity(n) > 1 && ((a && getTagDensity(a) < 1) || (b && getTagDensity(b) < 1));
     });
   }
 
@@ -419,7 +416,6 @@ var readify = function (){
       case "noscript":
       case "template":
       case "nav":
-      case "aside":
       case "h1":
       case "footer":
       case "address":
@@ -507,13 +503,15 @@ var readify = function (){
       case "figure":
       case "figcaption":
       case "li":
+      case "ul":
+      case "ol":
         if(nodeIsVisible(node)){
          break;
         } else {
          return markNoneContent(node, noneContentList, "invisible inline element");
         }
       case "a":
-        if(nodeIsVisible(node) && node.getAttribute('href') && node.getAttribute('href').indexOf("#") != 0 ){
+        if((nodeIsVisible(node) && node.getAttribute('href') && node.getAttribute('href').indexOf("#") != 0) || nodeHasGoodMedia(node)){
           break;
         } else {
           return markNoneContent(node, noneContentList, "invisible link or src=#");
