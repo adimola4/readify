@@ -3,6 +3,8 @@ lock '3.2.1'
 
 set :application, 'readify'
 set :repo_url, 'git@bitbucket.org:gashawmola/readify.git'
+set :branch, ENV["BRANCH"] || 'master'
+
 
 # Default branch is :master
 # ask :branch, proc { `git rev-parse --abbrev-ref HEAD`.chomp }.call

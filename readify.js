@@ -113,7 +113,7 @@ var readify = function (){
       score = 0;
 
       if(curNode.isVideo || curNode.isGoodImage){
-        score += 20;
+        score += 40;
       } else {
         score += getWordCount(getDirectInnerText(curNode));
       }
@@ -277,6 +277,8 @@ var readify = function (){
       node.removeAttribute('style');
       if(node.tagName.toLowerCase() == "font"){
         node.outerHTML = node.innerHTML;
+      } else if(node.src){
+        node.setAttribute("src", node.src);
       }
     }
   }
@@ -351,7 +353,8 @@ var readify = function (){
       /^(https?:\/\/|\/\/)(www\.)?vine\.co\/v\/(\w+)/, 
       /^(https?:\/\/|\/\/)(www\.)?vine\.co\/v\/(\w+)\/embed/, 
       /^(https?:\/\/|\/\/)(www\.)?instagram\.com\/p\/([\w\-]+)/, 
-      /^(https?:\/\/|\/\/)(www\.)?instagram\.com\/p\/([\w\-]+)\/embed/
+      /^(https?:\/\/|\/\/)(www\.)?instagram\.com\/p\/([\w\-]+)\/embed/,
+      /^(https?:\/\/|\/\/)player\.vimeo\.com\/video\/.*/
     ];
     var match = false;
     for(var i = videosRegex.length - 1; i >=0; --i ){
@@ -378,7 +381,7 @@ var readify = function (){
 
   var getOgVideo = function(){
     var ogVideoMeta = document.querySelector('[property="og:video"]');
-    if(ogVideoMeta){
+    if(ogVideoMeta && isVideoUrl(ogVideoMeta.getAttribute("content"))){
       var video = document.createElement("iframe");
       video.src = ogVideoMeta.getAttribute("content");
       return video;
