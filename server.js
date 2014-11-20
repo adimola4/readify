@@ -17,9 +17,116 @@ var dbg = function(msg){
   }
 }
 
+var configPage = function(page, send, timedOut){
+
+  var xhrUrls = [];
+
+  page.settings.userAgent = "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36";
+
+  page.viewportSize = { width: 1920, height: 1080 }
+
+  page.abortedUrls = [];
+
+  page.onInitialized = function(){
+    page.evaluate(xhrMarker);
+  }
+
+  page.onResourceRequested = function(requestData, networkRequest){
+    if(timedOut.already){
+      return networkRequest.abort();
+    }
+    if(page.url != 'about:blank' && !/(\.css|\.js|\.png|\.gif|\.jpe?g)/.test(requestData.url)){
+       var abort = true;
+       if(xhrUrls.indexOf(requestData.url) != -1){
+         dbg("xhr: "+ requestData.url);
+         abort = false;
+       }
+       if(abort){
+        dbg("aborting: " + requestData.url.substring(0, 256));
+        networkRequest.abort();
+        page.abortedUrls.push(requestData.url);
+       }
+    }
+  }
+
+  page.onCallback = function(data) {
+    switch(data.action){
+      case "addXhrUrl":
+        xhrUrls.push(data.url);
+        break;
+    }
+  }
+
+  page.onConsoleMessage = function(msg) {
+    if((/^(Readify|Benchmark)/).test(msg)){
+      dbg('page: ' + msg);
+    }
+  };
+
+  page.onNavigationRequested = function(url, type, willNavigate, main){
+    var openNewPage = function(newUrl){
+      dbg("navigating... : " + page.url + " > " + newUrl);
+      closePage(page);
+      openPageAndReadify(newUrl, send, timedOut);
+    }
+    dbg("nav req: " + page.url + " > " + url);
+    var rewritedUrl = findRewriteUrl(url);
+
+    if(rewritedUrl){
+      openNewPage(rewritedUrl);
+    } else if (page.url != 'about:blank' && page.url != "" && page.url != url && main){
+      openNewPage(url);
+    }
+  }
+
+  page.onError = function (msg, trace) {
+    dbg(msg);
+    trace.forEach(function(item) {
+      dbg('  ', item.file, ':', item.line);
+    });
+  }
+}
+
+var openPageAndReadify = function(url, send, timedOut){
+  if(!timedOut.already){
+    var page = webpage.create();
+    configPage(page, send, timedOut);
+    var startedAt = new Date;
+    page.open(url, function(status){
+      if(!timedOut.already){
+        console.log("Benchmark - " + page.url + " open: " + ( (new Date).getTime() - startedAt.getTime() ) + "ms");
+        if(!isUrlRedirecting(page.url)){
+          if(page.abortedUrls.length){
+            // page.evaluate(function(abortedUrls){ 
+            //   var images = document.querySelectorAll("img[src$='" + abortedUrls.join("'], img[src$='") + "']");
+            //   for(var i = images.length - 1; i >=0; --i){
+            //     console.log("Readify: image: " + images[i].src);
+            //     window.callPhantom({action: "addXhrUrl", url: images[i].src });
+            //     images[i].src = images[i].src;
+            //   }
+            // }, page.abortedUrls);
+          }
+          page.render("webpage.png");
+          page.injectJs('benchmark.js');
+          var out = page.evaluate(readify);
+          send(200, JSON.stringify(out), true);
+          closePage(page);
+        } else {
+          closePage(page);
+        }
+      }
+    });
+  }
+}
+
+var closePage = function(page){
+  page.stop();
+  page.close();
+  page.onInitialized = page.onLoadFinished = page.onResourceRequested = page.onCallback = page.onConsoleMessage = page.onNavigationRequested = page.onError = null;
+}
+
 function onRequest(req, res) {
-  var page          = webpage.create(),
-      requestServed = false;
+  var requestStartTime = new Date, timedOut = { already: false };
 
   if (req.method != "GET") {
     return send(405, toHTML("Method not accepted."));
@@ -45,99 +152,13 @@ function onRequest(req, res) {
     maxTime = 1.5*maxTime;
   }
   var timeout = setTimeout(function(){
-    console.log("page readify timeout (" + maxTime + "ms)");
+    timedOut.already = true;
     send(504, toHTML("page readify timeout"));
   }, maxTime);
 
-  var configPage = function(page){
-
-    var xhrUrls = [];
-
-    page.settings.userAgent = "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36";
-
-    page.viewportSize = { width: 1920, height: 1080 }
-
-    page.onInitialized = function(){
-      page.evaluate(xhrMarker);
-    }
-
-    page.onResourceRequested = function(requestData, networkRequest){
-      if(page.url != 'about:blank' && !/(\.css|\.js|\.png|\.gif|\.jpe?g)/.test(requestData.url)){
-         var abort = true;
-         if(xhrUrls.indexOf(requestData.url) != -1){
-           dbg("xhr: "+ requestData.url);
-           abort = false;
-         }
-         if(abort){
-          dbg("aborting: " + requestData.url.substring(0, 256));
-          networkRequest.abort();
-         }
-      }
-    }
-
-    page.onCallback = function(data) {
-      switch(data.action){
-        case "addXhrUrl":
-          xhrUrls.push(data.url);
-          break;
-      }
-    }
-
-    page.onConsoleMessage = function(msg) {
-      if((/^(Readify|Benchmark)/).test(msg)){
-        dbg('page: ' + msg);
-      }
-    };
-
-    page.onNavigationRequested = function(url, type, willNavigate, main){
-      var openNewPage = function(newUrl){
-        dbg("navigating... : " + page.url + " > " + newUrl);
-        page.readifyClosing = true;
-        page.stop();
-        page.close();
-        openPageAndReadify(newUrl);
-      }
-      dbg("nav req: " + page.url + " > " + url);
-      var rewritedUrl = findRewriteUrl(url);
-      
-      if(rewritedUrl){
-        openNewPage(rewritedUrl);
-      } else if (page.url != 'about:blank' && page.url != "" && page.url != url && main){
-        openNewPage(url);
-      }
-    }
-
-    page.onError = function (msg, trace) {
-        dbg(msg);
-        trace.forEach(function(item) {
-          dbg('  ', item.file, ':', item.line);
-        });
-    }
-  }
-
-  var out;
-
-  var openPageAndReadify = function(url){
-    var page = webpage.create();
-    configPage(page);
-    var startedAt = new Date;
-    page.open(url, function(status){
-      console.log("Benchmark - " + page.url + " open: " + ( (new Date).getTime() - startedAt.getTime() ) + "ms");
-      if(!isUrlRedirecting(page.url)){
-        page.render("webpage.png");
-        page.injectJs('benchmark.js');
-        out = page.evaluate(readify);
-        send(200, JSON.stringify(out), true);
-      }
-    });
-  }
-
-  openPageAndReadify(href);
-
-  function send(statusCode, data, isJson) {
-    if(!requestServed){
+  var send = function(statusCode, data, isJson) {
+    if(res){
       clearTimeout(timeout);
-
       res.statusCode = statusCode;
       if(isJson){
         res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -149,13 +170,14 @@ function onRequest(req, res) {
       res.write(data);
       res.close();
       res = null;
-      page.stop();
-      page.close();
-      page = null;
-
-      requestServed = true;
+      console.log("req: " + req.method + " " + req.url
+                  + " status: " + statusCode 
+                  + " time: " + ((new Date).getTime() - requestStartTime.getTime()) + "ms");
     }
   }
+
+  openPageAndReadify(href, send, timedOut);
+
 }
 
 function isUrlRedirecting(url){
