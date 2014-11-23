@@ -109,7 +109,11 @@ var openPageAndReadify = function(url, send, timedOut){
           page.render("webpage.png");
           page.injectJs('benchmark.js');
           var out = page.evaluate(readify);
-          send(200, JSON.stringify(out), true);
+          if(out && typeof out == "object"){
+            send(200, JSON.stringify(out), true);
+          } else {
+            send(500, toHTML("no content"));
+          }
           closePage(page);
         } else {
           closePage(page);
@@ -127,34 +131,6 @@ var closePage = function(page){
 
 function onRequest(req, res) {
   var requestStartTime = new Date, timedOut = { already: false };
-
-  if (req.method != "GET") {
-    return send(405, toHTML("Method not accepted."));
-  }
-
-  var url = parse(req.url);
-
-  if(url.pathname == "/test"){
-    return send(200, toHTML("Test is OK"));
-  } else if (url.pathname != "/") {
-    return send(404, toHTML("Not found."));
-  }
-
-  var query = url.query,
-      href  = query.href;
-
-  if (!href) {
-    return send(400, toHTML("`href` parameter is missing."));
-  }
-
-  var maxTime = config.maxTime;
-  if(isUrlRedirecting(href)){
-    maxTime = 1.5*maxTime;
-  }
-  var timeout = setTimeout(function(){
-    timedOut.already = true;
-    send(504, toHTML("page readify timeout"));
-  }, maxTime);
 
   var send = function(statusCode, data, isJson) {
     if(res){
@@ -176,7 +152,43 @@ function onRequest(req, res) {
     }
   }
 
-  openPageAndReadify(href, send, timedOut);
+  if (req.method != "GET") {
+    return send(405, toHTML("Method not accepted."));
+  }
+
+  var url = parse(req.url);
+
+  var query = url.query,
+      href  = query.href;
+
+  var maxTime = config.maxTime;
+  if(href && isUrlRedirecting(href)){
+    maxTime = 1.5*maxTime;
+  }
+  var timeout = setTimeout(function(){
+    if(!timedOut.already){
+      timedOut.already = true;
+      send(504, toHTML("page timeout"));
+    }
+  }, maxTime);
+
+  if(url.pathname == "/test"){
+    var testPage = webpage.create();
+    testPage.open("http://www.google.com/", function(){
+      if(testPage.evaluate(function(){ return true; })){
+        send(200, toHTML("Test is OK"));
+      } else {  
+        send(500, toHTML("Test is not OK"));
+      }
+      return closePage(testPage);
+    });
+  } else if (url.pathname != "/") {
+    return send(404, toHTML("Not found."));
+  } else if (!href) {
+    return send(400, toHTML("`href` parameter is missing."));
+  } else {
+    openPageAndReadify(href, send, timedOut);
+  }
 
 }
 

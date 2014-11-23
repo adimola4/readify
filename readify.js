@@ -9,77 +9,86 @@ var readify = function (){
   }
 
   var extract = function(){
-    
-    var i;
+    try {
+      var i;
 
-    var rating = rateContent();
-    dbg("topCandidate: " + (rating.topCandidate && eToS(rating.topCandidate)));
+      //scrollInSteps(document.body.clientHeight - window.innerHeight, 500, function(){ window.scrollTo(0,0) });
+      window.scrollTo(0, 100);
+      window.scrollTo(0, 0);
 
-    var topCandidate = rating.topCandidate,
-        videos = rating.videos,
-        goodImages = rating.goodImages;
+      var rating = rateContent();
+      dbg("topCandidate: " + (rating.topCandidate && eToS(rating.topCandidate)));
 
-    var articleContents = [], articleTitle = "";
-    if(topCandidate){
-      var sibling, topCandidateSiblings = Array.prototype.slice.call(topCandidate.parentNode.children);
-      for(i = topCandidateSiblings.length - 1; i >= 0 ; --i){
-        sibling = topCandidateSiblings[i];
-        if(sibling === topCandidate || getAggragatedScore(sibling) >= 3){
-          articleContents.unshift(sibling);
-          (sibling != topCandidate) && dbg("Added sibling "+ eToS(sibling));
+      var topCandidate = rating.topCandidate,
+          videos = rating.videos,
+          goodImages = rating.goodImages;
+
+      var articleContents = [], articleTitle = "";
+      if(topCandidate){
+        var sibling, topCandidateSiblings = Array.prototype.slice.call(topCandidate.parentNode.children);
+        for(i = topCandidateSiblings.length - 1; i >= 0 ; --i){
+          sibling = topCandidateSiblings[i];
+          if(sibling === topCandidate || getAggragatedScore(sibling) >= 3){
+            articleContents.unshift(sibling);
+            (sibling != topCandidate) && dbg("Added sibling "+ eToS(sibling));
+          }
+        }
+        var boundLookupRect = topCandidate.parentNode.getBoundingClientRect(), curMediaRect, medias = videos.concat(goodImages), additionalMedia = null;
+        for(i = medias.length - 1; i >= 0; --i){
+          curMediaRect = medias[i].getBoundingClientRect();
+          if((curMediaRect.bottom <= boundLookupRect.top) && (curMediaRect.width > 0.5 * boundLookupRect.width) &&
+             ((curMediaRect.left >= boundLookupRect.left && curMediaRect.right <= boundLookupRect.right) ||
+              (curMediaRect.left <= boundLookupRect.left && curMediaRect.right >= boundLookupRect.right))){
+            additionalMedia = medias[i];
+            break;
+          }
+        }
+
+        if(additionalMedia){
+          articleContents.unshift(additionalMedia);
+          dbg("additional media: " + eToS(additionalMedia));
+        }
+
+        articleTitle = extractTitle();
+
+        removeNoneContent(articleContents, topCandidate);
+        
+        for(i = articleContents.length - 1; i >= 0; --i){
+          cleanNode(articleContents[i]);
+        }
+      } else {
+        articleTitle = extractTitle();
+      }
+
+      if(!videos.length){
+        var ogVideo = getOgVideo();
+        if(ogVideo){
+          articleContents.unshift(ogVideo);
+          dbg("og video: " + eToS(ogVideo));
         }
       }
-      var boundLookupRect = topCandidate.parentNode.getBoundingClientRect(), curMediaRect, medias = videos.concat(goodImages), additionalMedia = null;
-      for(i = medias.length - 1; i >= 0; --i){
-        curMediaRect = medias[i].getBoundingClientRect();
-        if((curMediaRect.bottom <= boundLookupRect.top) && (curMediaRect.width > 0.5 * boundLookupRect.width) &&
-           ((curMediaRect.left >= boundLookupRect.left && curMediaRect.right <= boundLookupRect.right) ||
-            (curMediaRect.left <= boundLookupRect.left && curMediaRect.right >= boundLookupRect.right))){
-          additionalMedia = medias[i];
-          break;
+
+      if((topCandidate && topCandidate.readify.score < 20 || !topCandidate) && videos.length == 0 && goodImages.length == 0 && !ogVideo){
+        var content = null;
+      } else {
+        var content = "";
+        for(i = articleContents.length -1; i >=0; --i){
+          content = articleContents[i].outerHTML + content;
         }
       }
 
-      if(additionalMedia){
-        articleContents.unshift(additionalMedia);
-        dbg("additional media: " + eToS(additionalMedia));
-      }
-
-      articleTitle = extractTitle();
-
-      removeNoneContent(articleContents, topCandidate);
-      
-      for(i = articleContents.length - 1; i >= 0; --i){
-        cleanNode(articleContents[i]);
-      }
-    } else {
-      articleTitle = extractTitle();
+      return content && { title: articleTitle, content: content, url: location.href, isRTL: langIsRTL(topCandidate.innerText || "abc")};
+    } catch (e){
+      dbg("error: " + e + " line: " + e.line );
+      return null;
     }
-
-    if(!videos.length){
-      var ogVideo = getOgVideo();
-      if(ogVideo){
-        articleContents.unshift(ogVideo);
-        dbg("og video: " + eToS(ogVideo));
-      }
-    }
-
-    if((topCandidate && topCandidate.readify.score < 20 || !topCandidate) && videos.length == 0 && goodImages.length == 0 && !ogVideo){
-      var content = null;
-    } else {
-      var content = "";
-      for(i = articleContents.length -1; i >=0; --i){
-        content = articleContents[i].outerHTML + content;
-      }
-    }
-
-    return content && { title: articleTitle, content: content, url: location.href };
   }
 
   var rateContent = function(){
     var i;
 
-    var nodesToScore = document.querySelectorAll("p, div, pre, section, article, blockquote, li, td, span, font, img, iframe");
+    var nodesToScore = document.body.querySelectorAll("p, div, pre, section, article, blockquote, li, td, span, font, img, iframe, "
+                                                      + "em, strong, small, s, cite, q, dfn, abbv, data, time, code, var, samp, kbd, sub, sup, i, b, u, mark, ruby, rt, rp, bdi");
     var candidates = [];
 
     var curNode, parentNode, grandParentNode, score, tagName, goodImages = [], videos = [];
@@ -89,6 +98,10 @@ var readify = function (){
 
       tagName = curNode.nodeName.toLowerCase();
 
+      if(!nodeIsVisible(curNode)){
+        continue;
+      }
+
       if(tagName == "iframe" && isVideoUrl(curNode.src)){
         curNode.isVideo = true;
         videos.push(curNode);
@@ -96,8 +109,6 @@ var readify = function (){
         curNode.isGoodImage = true;
         curNode.src = curNode.src;
         goodImages.push(curNode);
-      } else if(!nodeIsVisible(curNode)){
-        continue;
       }
       
       initNode(curNode);
@@ -119,27 +130,43 @@ var readify = function (){
       }
 
       curNode.readify.score += score;
-      if(curNode.readify.score > 40){
+
+      if(curNode.readify.score > 0){
         candidates.push(curNode);
-      }
 
-      parentNode.readify.score += score/2;
-      candidates.push(parentNode);
+        parentNode.readify.score += score/2;
+        candidates.push(parentNode);
 
-      if(grandParentNode){
-        grandParentNode.readify.score += score/3;
-        candidates.push(grandParentNode);
+        if(grandParentNode){
+          grandParentNode.readify.score += score/3;
+          candidates.push(grandParentNode);
+        }
       }
 
     }
 
-    var curCandidate, topCandidate = null;
-    for(i = candidates.length - 1; i >= 0; --i){
-      curCandidate = candidates[i];
-      if(!topCandidate || (curCandidate.readify.score > topCandidate.readify.score)){
-        topCandidate = curCandidate;
+    dbg(candidates.length + " candidates");
+
+    var lookupLimitTop = 500, docHeight = document.body.clientHeight, curCandidate, topCandidate = null;
+    do {
+      if(lookupLimitTop > 2000 || lookupLimitTop >= docHeight){
+        lookupLimitTop = null;
       }
-    }
+      for(i = candidates.length - 1; i >= 0; --i){
+        curCandidate = candidates[i];
+        curCandidate.readify.score >= 20 && dbg("candidate: " + eToS(curCandidate) + " score: " + curCandidate.readify.score + " lookupLimitTop: " + lookupLimitTop);
+        if(!topCandidate || ((curCandidate.readify.score > topCandidate.readify.score) && (!lookupLimitTop || (lookupLimitTop && (curCandidate.getBoundingClientRect().top < lookupLimitTop))) )){
+          topCandidate = curCandidate;
+          dbg("topCandidate: " + eToS(topCandidate) + " score: " + topCandidate.readify.score + " lookupLimitTop: " + lookupLimitTop);
+        }
+      }
+      if(topCandidate  && (topCandidate.readify.score > 100 || (lookupLimitTop >= 2000 && topCandidate.readify.score > 50 ))){
+        break;
+      } else if(lookupLimitTop){
+        lookupLimitTop += 500;
+      }
+    } while(lookupLimitTop);
+    
 
     return { topCandidate: topCandidate, videos: videos, goodImages: goodImages }
   }
@@ -164,14 +191,7 @@ var readify = function (){
         return title;
       }
     }
-    var ogTitle = document.querySelector("meta[property='og:title']");
-    title = ogTitle && ogTitle.getAttribute("content") || "";
-    titleWordCount = getWordCount(title);
-    if(title && titleWordCount >= 3 && (docTitleWordCount - titleWordCount) <= 5){
-      return title;
-    } else {
-      return docTitle;
-    }
+    return docTitle;
   }
 
   var initNode = function(node){
@@ -222,21 +242,53 @@ var readify = function (){
   var nodeIsVisible = function(node){
     var style = getComputedStyle(node);
     var rect = node.getBoundingClientRect(node);
+    var parentNode = node.parentNode;
+    if(parentNode == document.body){
+      parentNode = null;
+    }
     return  style.getPropertyValue("display").toLowerCase() != 'none' &&
             style.getPropertyValue("visibility").toLowerCase() != 'hidden' &&
-            ((node.childNodes.length > 0 && style.getPropertyValue("overflow") != "hidden") || (rect.width > 1 && rect.height > 1));
+            ((node.childNodes.length > 0 && style.getPropertyValue("overflow") != "hidden") || (rect.width > 1 && rect.height > 1)) &&
+            (!parentNode || (parentNode && nodeIsVisible(parentNode)));
   }
 
   var getAggragatedScore = function(node){
-    var score = 0, children = node.children;
+    var score = 0, children = node.children || [];
     if(children.length){
       for(var i = children.length - 1; i >= 0; --i){
         score += getAggragatedScore(children[i]);
       }
-    } else {
-      score += (node.readify && node.readify.score) || 0;
-    }
+    } 
+    score += (node.readify && node.readify.score) || 0;
     return score;
+  }
+
+  var langIsRTL = function(sampleText) {
+    var t = sampleText.replace(/@\w+/, ''),
+        countHeb = countMatches('[\\u05B0-\\u05F4\\uFB1D-\\uFBF4]'),
+        countArb = countMatches('[\\u060C-\\u06FE\\uFB50-\\uFEFC]');
+
+    function countMatches (match) {
+        var matches = t.match(new RegExp(match, 'g'));
+        return matches !== null ? matches.length : 0;
+    }
+
+    return (countHeb + countArb) * 100 / t.length > 20;
+  }
+
+  var scrollInSteps = function(y, step, callback){
+    if(y == window.scrollY){
+      return callback();
+    } else if(y < window.scrollY){
+      step = -step;
+    }
+    if(Math.abs(window.scrollY - y) < Math.abs(step)){
+      window.scrollTo(0, y);
+      callback();
+    } else {
+      window.scrollTo(0, window.scrollY + step);
+      setTimeout(function(){ scrollInSteps(y, step, callback) }, 10);
+    }
   }
 
   var removeNode = function(node){
@@ -267,11 +319,11 @@ var readify = function (){
 
   // TODO: simplfy node structure.
   var cleanNode = function(node){
-    var children = Array.prototype.slice.call(node.children);
+    var children = Array.prototype.slice.call(node.children || []);
     for(var i = children.length - 1; i >= 0; --i){
       cleanNode(children[i]);
     }
-    if(!(node.isGoodImage || node.isVideo) && node.childElementCount == 0 && node.innerText.trim() == "" && node.nodeName.toLowerCase() != "br"){
+    if(!(node.isGoodImage || node.isVideo) && node.childElementCount == 0 && node.innerText.trim() == "" && node.nodeName.toLowerCase() != "br" && node.nodeName.toLowerCase() != "td"){
       node.parentNode && node.parentNode.removeChild(node);
     } else {
       node.removeAttribute('style');
@@ -367,7 +419,7 @@ var readify = function (){
   }
 
   var isGoodImage = function(img){
-    var minRatio = 1/3, maxRatio = 3;
+    var minRatio = 1/9, maxRatio = 3;
     var width = img.width;
     var height = img.height;
     if(img.src && width > 200 && height > 100){
@@ -465,15 +517,6 @@ var readify = function (){
       case "math":
         return markNoneContent(node, noneContentList, "none content element(*)");//maybe support in the future
       case "table":
-      case "caption":
-      case "colgroup":
-      case "col":
-      case "thead":
-      case "tbody":
-      case "tfoot":
-      case "tr":
-      case "td":
-      case "th":
       case "h2":
       case "h3":
       case "h4":
@@ -519,23 +562,34 @@ var readify = function (){
         } else {
           return markNoneContent(node, noneContentList, "invisible link or src=#");
         }
+      case "td":
+      case "th":
+      case "tr":
+      case "tbody":
+      case "thead":
+      case "tfoot":
+      case "caption":
+      case "colgroup":
+      case "col":
+        break;
       default:
         if(!nodeIsVisible(node)){
           return markNoneContent(node, noneContentList, "invisible element");
         } else if(!nodeHasGoodMedia(node)) {
+          var wordCount = getWordCount(node.innerText);
           if(nodeIsPositioned(node)){
             return markNoneContent(node, noneContentList, "element is positioned");
           } else if(nodeIsFloating(node)){
             return markNoneContent(node, noneContentList, "element is floating");
-          } else if(isFontSizeSmaller(node)){
+          } else if(isFontSizeSmaller(node) && wordCount < 40){
             return markNoneContent(node, noneContentList, "element font size is smaller");
-          } else if(nodeHasLargerTagDensity(node)){
+          } else if(nodeHasLargerTagDensity(node) && wordCount < 100){
             return markNoneContent(node, noneContentList, "element has larger tag density");
           }
         }
     }
 
-    var children = node.children;
+    var children = node.children || [];
     for( var i = children.length - 1; i >= 0; --i){
       grabNoneContent(children[i], noneContentList);
     }
