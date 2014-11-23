@@ -19,41 +19,27 @@ var dbg = function(msg){
 
 var configPage = function(page, send, timedOut){
 
-  var xhrUrls = [];
-
   page.settings.userAgent = "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36";
 
   page.viewportSize = { width: 1920, height: 1080 }
 
-  page.abortedUrls = [];
+  page.iframeUrls = [];
 
-  page.onInitialized = function(){
-    page.evaluate(xhrMarker);
+  page.onCallback = function(msg){
+    switch(msg.action){
+
+    }
   }
 
   page.onResourceRequested = function(requestData, networkRequest){
     if(timedOut.already){
       return networkRequest.abort();
     }
-    if(page.url != 'about:blank' && !/(\.css|\.js|\.png|\.gif|\.jpe?g)/.test(requestData.url)){
-       var abort = true;
-       if(xhrUrls.indexOf(requestData.url) != -1){
-         dbg("xhr: "+ requestData.url);
-         abort = false;
-       }
-       if(abort){
-        dbg("aborting: " + requestData.url.substring(0, 256));
-        networkRequest.abort();
-        page.abortedUrls.push(requestData.url);
-       }
-    }
-  }
-
-  page.onCallback = function(data) {
-    switch(data.action){
-      case "addXhrUrl":
-        xhrUrls.push(data.url);
-        break;
+    if(page.url != 'about:blank' && page.iframeUrls.indexOf(requestData.url) != -1){
+      dbg("aborting: " + requestData.url.substring(0, 256));
+      networkRequest.abort();
+    } else {
+      dbg("allowing: " + requestData.url.substring(0, 256));
     }
   }
 
@@ -70,11 +56,14 @@ var configPage = function(page, send, timedOut){
       openPageAndReadify(newUrl, send, timedOut);
     }
     dbg("nav req: " + page.url + " > " + url);
+    if(!main){
+      return page.iframeUrls.push(url);
+    }
     var rewritedUrl = findRewriteUrl(url);
 
     if(rewritedUrl){
       openNewPage(rewritedUrl);
-    } else if (page.url != 'about:blank' && page.url != "" && page.url != url && main){
+    } else if (page.url != 'about:blank' && page.url != "" && page.url != url){
       openNewPage(url);
     }
   }
@@ -93,19 +82,9 @@ var openPageAndReadify = function(url, send, timedOut){
     configPage(page, send, timedOut);
     var startedAt = new Date;
     page.open(url, function(status){
-      if(!timedOut.already){
+      if(!timedOut.already && !page.stopping){
         console.log("Benchmark - " + page.url + " open: " + ( (new Date).getTime() - startedAt.getTime() ) + "ms");
         if(!isUrlRedirecting(page.url)){
-          if(page.abortedUrls.length){
-            // page.evaluate(function(abortedUrls){ 
-            //   var images = document.querySelectorAll("img[src$='" + abortedUrls.join("'], img[src$='") + "']");
-            //   for(var i = images.length - 1; i >=0; --i){
-            //     console.log("Readify: image: " + images[i].src);
-            //     window.callPhantom({action: "addXhrUrl", url: images[i].src });
-            //     images[i].src = images[i].src;
-            //   }
-            // }, page.abortedUrls);
-          }
           page.render("webpage.png");
           page.injectJs('benchmark.js');
           var out = page.evaluate(readify);
@@ -115,15 +94,16 @@ var openPageAndReadify = function(url, send, timedOut){
             send(500, toHTML("no content"));
           }
           closePage(page);
-        } else {
-          closePage(page);
         }
+      } else if(!page.stopping){
+        closePage(page);
       }
     });
   }
 }
 
 var closePage = function(page){
+  page.stopping = true;
   page.stop();
   page.close();
   page.onInitialized = page.onLoadFinished = page.onResourceRequested = page.onCallback = page.onConsoleMessage = page.onNavigationRequested = page.onError = null;
