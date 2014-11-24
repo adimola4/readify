@@ -26,14 +26,17 @@ var readify = function (){
       var articleContents = [], articleTitle = "";
       if(topCandidate){
         var sibling,
+            siblingRect,
+            topCandidateRect = topCandidate.getBoundingClientRect();
             topCandidateMaybeComment = nodeMaybeComment(topCandidate),
             topCandidateSiblings = Array.prototype.slice.call(topCandidate.parentNode.children);
         for(i = topCandidateSiblings.length - 1; i >= 0 ; --i){
           sibling = topCandidateSiblings[i];
+          siblingRect = sibling.getBoundingClientRect();
           if(sibling === topCandidate || 
-            (getAggragatedScore(sibling) >= 3 && 
-              (topCandidateMaybeComment || 
-              (!topCandidateMaybeComment && !nodeMaybeComment(sibling))))){
+              (getAggragatedScore(sibling) >= 3 &&
+              ((siblingRect.bottom <= topCandidateRect.top) || (siblingRect.top >= topCandidateRect.bottom)) &&
+              (topCandidateMaybeComment ||(!topCandidateMaybeComment && !nodeMaybeComment(sibling))))){
             articleContents.unshift(sibling);
             (sibling != topCandidate) && dbg("Added sibling "+ eToS(sibling));
           }
@@ -164,6 +167,9 @@ var readify = function (){
       }
       for(i = candidates.length - 1; i >= 0; --i){
         curCandidate = candidates[i];
+        if(curCandidate.tagName == "A"){
+          continue;
+        }
         if(!topCandidate || (!nodeMaybeComment(curCandidate) && (curCandidate.readify.score > topCandidate.readify.score) && (!lookupLimitTop || (lookupLimitTop && (curCandidate.getBoundingClientRect().top < lookupLimitTop))) )){
           topCandidate = curCandidate;
           dbg("topCandidate: " + eToS(topCandidate) + " score: " + topCandidate.readify.score + " lookupLimitTop: " + lookupLimitTop);
@@ -209,7 +215,7 @@ var readify = function (){
   var removeNoneContent = function(articleContents, topCandidate){
     var i, noneContent = [];
     for(i = articleContents.length -1; i >= 0; --i ){
-      grabNoneContent(articleContents[i], noneContent, topCandidate);
+      grabNoneContent(articleContents[i], noneContent);
     }
 
     var toRemoveNode, contentIndex;
@@ -243,8 +249,8 @@ var readify = function (){
     }
   }
 
-  var grabNoneContent = function(node, noneContentList, topCandidate){
-    var linkDensity, tagName = node.nodeName.toLowerCase();
+  var grabNoneContent = function(node, noneContentList){
+    var nodeStyle, tagName = node.nodeName.toLowerCase();
     if(!node.isTopCandidate){
       switch(tagName){
         case "br":
@@ -256,8 +262,6 @@ var readify = function (){
         case "template":
         case "nav":
         case "h1":
-        case "footer":
-        case "address":
         case "hr":
         case "form":
         case "fieldset":
@@ -282,14 +286,6 @@ var readify = function (){
         case "map":
         case "area":
         case "wbr":
-          return markNoneContent(node, noneContentList, "none content element");
-        case "img":
-        case "iframe":
-          if(node.isGoodImage || node.isVideo){
-            return;
-          } else {
-            return markNoneContent(node, noneContentList, "bad img/iframe");
-          }
         case "embed":
         case "object":
         case "param":
@@ -299,7 +295,14 @@ var readify = function (){
         case "track":
         case "svg":
         case "math":
-          return markNoneContent(node, noneContentList, "none content element(*)");//maybe support in the future
+          return markNoneContent(node, noneContentList, "none content element");
+        case "img":
+        case "iframe":
+          if(node.isGoodImage || node.isVideo){
+            return;
+          } else {
+            return markNoneContent(node, noneContentList, "bad img/iframe");
+          }
         case "table":
         case "h2":
         case "h3":
@@ -332,16 +335,13 @@ var readify = function (){
         case "bdi":
         case "figure":
         case "figcaption":
-        case "li":
-        case "ul":
-        case "ol":
           if(nodeIsVisible(node)){
            break;
           } else {
            return markNoneContent(node, noneContentList, "invisible inline element");
           }
         case "a":
-          if((nodeIsVisible(node) && node.getAttribute('href') && node.getAttribute('href').indexOf("#") != 0) || nodeHasGoodMedia(node)){
+          if((nodeIsVisible(node) && node.getAttribute("href") && node.getAttribute("href").indexOf("#") != 0) || nodeHasGoodMedia(node)){
             break;
           } else {
             return markNoneContent(node, noneContentList, "invisible link or src=#");
@@ -355,22 +355,42 @@ var readify = function (){
         case "caption":
         case "colgroup":
         case "col":
+        case "li":
           break;
         default:
           if(!nodeIsVisible(node)){
             return markNoneContent(node, noneContentList, "invisible element");
-          } else if(nodeMaybeComment(node)){
-            return markNoneContent(node, noneContentList, "element might be a comment");
-          } else if(!nodeHasGoodMedia(node)) {
-            var wordCount = getWordCount(node.innerText);
-            if(nodeIsPositioned(node)){
-              return markNoneContent(node, noneContentList, "element is positioned");
-            } else if(nodeIsFloating(node)){
-              return markNoneContent(node, noneContentList, "element is floating");
-            } else if(isFontSizeSmaller(node) && wordCount < 40){
-              return markNoneContent(node, noneContentList, "element font size is smaller");
-            } else if(nodeHasLargerTagDensity(node) && wordCount < 100){
-              return markNoneContent(node, noneContentList, "element has larger tag density");
+          } else {
+            
+            if(nodeMaybeAd(node) || nodeMaybeNav(node)){
+              if(getLinkDensity(node) > 0.333333 || node.querySelectorAll("a img, iframe").length > 0){
+                return markNoneContent(node, noneContentList, "(ad|nav)");
+              }
+            }
+            
+            if(nodeMaybeComment(node)){
+              return markNoneContent(node, noneContentList, "element might be a comment");//later check for template patterns.
+            }
+            
+            nodeStyle = window.getComputedStyle(node);
+
+            if(getWordCount(node.innerText) < 40 && !nodeHasGoodMedia(node)){
+              if(isFontSizeSmaller(node)){
+                return markNoneContent(node, noneContentList, "element font size is smaller");
+              } else if(nodeStyle.getPropertyValue("position") != "static"){
+                return markNoneContent(node, noneContentList, "element is positioned");
+              } else if(nodeStyle.getPropertyValue("float") != "none"){
+                return markNoneContent(node, noneContentList, "element is floating");
+              } else if(node.querySelectorAll("img, iframe, embed, object").length > 0 
+                        && node.getElementsByTagName("a").length > 0){
+                return markNoneContent(node, noneContentList, "element has link & bad media");
+              }
+            }
+            if(!nodeHasGoodMedia(node) && getLinkDensity(node) > 0.90){
+              return markNoneContent(node, noneContentList, "element with too much links")
+            }
+            if(!getAggragatedScore(node)){
+              return markNoneContent(node, noneContentList, "element without content");
             }
           }
       }
@@ -378,7 +398,7 @@ var readify = function (){
 
     var children = node.children || [];
     for( var i = children.length - 1; i >= 0; --i){
-      grabNoneContent(children[i], noneContentList, topCandidate);
+      grabNoneContent(children[i], noneContentList);
     }
   }
 
@@ -417,16 +437,6 @@ var readify = function (){
     }
   }
 
-  var getTagDensity = function(node){
-    var textWordCount = getWordCount(node.innerText);
-    var tagCount = node.getElementsByTagName("*").length;
-    if(textWordCount == 0){
-      return tagCount > 0 ? 1 : 0;
-    } else {
-      return tagCount / textWordCount;
-    }
-  }
-
   var nodeIsVisible = function(node){
     var style = getComputedStyle(node);
     var rect = node.getBoundingClientRect(node);
@@ -460,7 +470,7 @@ var readify = function (){
   }
 
   var nodeMaybeNav = function(node){
-    return /(related|tags|sidebar|outbrain)/i.test(node.className + " " + node.id);
+    return /(related|tags|sidebar|outbrain|recommend|tools|navbar)/i.test(node.className + " " + node.id);
   }
 
   var isVideoUrl = function(url){
@@ -556,30 +566,6 @@ var readify = function (){
       } else {
         return false;
       }
-    });
-  }
-
-  var nodeIsPositioned = function(node){
-    return compEnv(node, function(n, a, b){
-      var nPosition = getComputedStyle(n).getPropertyValue("position") == "absolute";
-      var aPosition = a && getComputedStyle(a).getPropertyValue("position") == "absolute";
-      var bPosition = b && getComputedStyle(b).getPropertyValue("position") == "absolute";
-      return nPosition && !(aPosition && bPosition );
-    });
-  }
-
-  var nodeIsFloating = function(node){
-    return compEnv(node, function(n, a, b){
-      var nFloat = getComputedStyle(n).getPropertyValue("float") != "none";
-      var aFloat = a && getComputedStyle(a).getPropertyValue("float") != "none";
-      var bFloat = b && getComputedStyle(b).getPropertyValue("float") != "none";
-      return nFloat && !(aFloat && bFloat);
-    });
-  }
-
-  var nodeHasLargerTagDensity = function(node){
-    return compEnv(node, function(n, a, b){
-      return getTagDensity(n) > 1 && ((a && getTagDensity(a) < 1) || (b && getTagDensity(b) < 1));
     });
   }
 
