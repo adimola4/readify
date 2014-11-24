@@ -41,12 +41,19 @@ var readify = function (){
             (sibling != topCandidate) && dbg("Added sibling "+ eToS(sibling));
           }
         }
-        var boundLookupRect = topCandidate.parentNode.getBoundingClientRect(), curMediaRect, medias = videos.concat(goodImages), additionalMedia = null;
+        var boundLookupRect = topCandidate.parentNode.getBoundingClientRect(), 
+            curMediaRect, medias = videos.concat(goodImages), 
+            badMedia = Array.prototype.slice.call(document.body.querySelectorAll("a img, a iframe")),
+            curMedia = null,
+            additionalMedia = null;
         for(i = medias.length - 1; i >= 0; --i){
-          curMediaRect = medias[i].getBoundingClientRect();
+          curMedia = medias[i];
+          curMediaRect = curMedia.getBoundingClientRect();
           if((curMediaRect.bottom <= boundLookupRect.top) && (curMediaRect.width > 0.5 * boundLookupRect.width) &&
              ((curMediaRect.left >= boundLookupRect.left && curMediaRect.right <= boundLookupRect.right) ||
-              (curMediaRect.left <= boundLookupRect.left && curMediaRect.right >= boundLookupRect.right))){
+              (curMediaRect.left <= boundLookupRect.left && curMediaRect.right >= boundLookupRect.right)) &&
+             badMedia.indexOf(curMedia) == -1 &&
+             !topCandidate.parentNode.querySelector("img[src='" + curMedia.getAttribute("src") + "'], iframe[src='"+ curMedia.getAttribute("src") +"']")){
             additionalMedia = medias[i];
             break;
           }
@@ -58,6 +65,10 @@ var readify = function (){
         }
 
         articleTitle = extractTitle();
+
+        // articleAuthor = extractAuthor();
+
+        // articlePublishedAt = extractPublishedAt();
 
         removeNoneContent(articleContents, topCandidate);
         
@@ -371,6 +382,24 @@ var readify = function (){
             if(nodeMaybeComment(node)){
               return markNoneContent(node, noneContentList, "element might be a comment");//later check for template patterns.
             }
+
+            if(nodeMaybeAuthorDetail(node)){
+              if(getWordCount(node.innerText) < 30){
+                return markNoneContent(node, noneContentList, "element is author details");
+              }
+            }
+
+            if(nodeMaybePubDate(node)){
+              if(getWordCount(node.innerText) < 20){
+                return markNoneContent(node, noneContentList, "element is pubDate");
+              }
+            }
+
+            if(nodeMaybeShareTools(node)){
+              if(getWordCount(node.innerText) < 30 && /\d+/.test(node.innerText)){
+                return markNoneContent(node, noneContentList, "element is share tools");
+              }
+            }
             
             nodeStyle = window.getComputedStyle(node);
 
@@ -471,6 +500,19 @@ var readify = function (){
 
   var nodeMaybeNav = function(node){
     return /(related|tags|sidebar|outbrain|recommend|tools|navbar)/i.test(node.className + " " + node.id);
+  }
+
+  var nodeMaybeShareTools = function(node){
+    return /(share|social|tools|widget)/i.test(node.className + " " + node.id);
+  }
+
+  var nodeMaybeAuthorDetail = function(node){
+    return node.getAttribute("itemprop") == "author" || /(author|by.?line)/i.test(node.className + " " + node.id);
+  }
+
+  var nodeMaybePubDate = function(node){
+    return node.getAttribute("itemprop") == "datePublished" || node.getAttribute("itemprop") == "dateCreated" || node.getAttribute("itemprop") == "dateModified"
+           || /(pubdate|published.?date|date.?published|tmstmp|timestamp)/i.test(node.className + " " + node.id);
   }
 
   var isVideoUrl = function(url){
