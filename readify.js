@@ -80,6 +80,7 @@ var readify = function (){
         for(i = articleContents.length -1; i >=0; --i){
           content = articleContents[i].outerHTML + content;
         }
+        content = killBrs(content);
       }
 
       return content && { title: articleTitle, content: content, url: location.href, isRTL: langIsRTL(topCandidate.innerText || "abc")};
@@ -620,6 +621,10 @@ var readify = function (){
     if(parentNode){
       parentNode.removeChild(node);
     }
+  }
+
+  var killBrs = function(html){
+    return html.replace(/(<br\s*\/?>(\s|&nbsp;?)*){1,}/g, "<br />");
   }
 
   extract = benchmark("extract", extract);
