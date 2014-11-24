@@ -6,7 +6,6 @@ var config     = require("./config.js"),
     readify = require('./readify'),
     redirectingUrls = require('./redirecting_urls'),
     rewriteUrls = require('./rewrite_urls'),
-    xhrMarker = require('./xhr_marker'),
     benchmark = require('./benchmark');
 
 var verbose = config.verbose;
@@ -20,6 +19,8 @@ var dbg = function(msg){
 var configPage = function(page, send, timedOut){
 
   page.settings.userAgent = "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36";
+
+  page.settings.resourceTimeout = 2000;
 
   page.viewportSize = { width: 1920, height: 1080 }
 

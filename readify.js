@@ -138,16 +138,16 @@ var readify = function (){
         score *= 0.01;
       }
 
-      curNode.readify.score += score;
+      curNode.readify.score += score/2;
 
       if(curNode.readify.score > 0){
         candidates.push(curNode);
 
-        parentNode.readify.score += score/2;
+        parentNode.readify.score += score;
         candidates.push(parentNode);
 
         if(grandParentNode){
-          grandParentNode.readify.score += score/3;
+          grandParentNode.readify.score += score/2;
           candidates.push(grandParentNode);
         }
       }
@@ -163,7 +163,7 @@ var readify = function (){
       }
       for(i = candidates.length - 1; i >= 0; --i){
         curCandidate = candidates[i];
-        if(!topCandidate || ((curCandidate.readify.score > topCandidate.readify.score) && (!lookupLimitTop || (lookupLimitTop && (curCandidate.getBoundingClientRect().top < lookupLimitTop))) )){
+        if(!topCandidate || (!nodeMaybeComment(curCandidate) && (curCandidate.readify.score > topCandidate.readify.score) && (!lookupLimitTop || (lookupLimitTop && (curCandidate.getBoundingClientRect().top < lookupLimitTop))) )){
           topCandidate = curCandidate;
           dbg("topCandidate: " + eToS(topCandidate) + " score: " + topCandidate.readify.score + " lookupLimitTop: " + lookupLimitTop);
         }
@@ -175,6 +175,9 @@ var readify = function (){
       }
     } while(lookupLimitTop);
     
+    if(topCandidate){
+      topCandidate.isTopCandidate = true;
+    }
 
     return { topCandidate: topCandidate, videos: videos, goodImages: goodImages }
   }
@@ -474,131 +477,135 @@ var readify = function (){
 
   var grabNoneContent = function(node, noneContentList){
     var linkDensity, tagName = node.nodeName.toLowerCase();
-    switch(tagName){
-      case "br":
-        return;
-      case "style":
-      case "script":
-      case "link":
-      case "noscript":
-      case "template":
-      case "nav":
-      case "h1":
-      case "footer":
-      case "address":
-      case "hr":
-      case "form":
-      case "fieldset":
-      case "legend":
-      case "label":
-      case "input":
-      case "button":
-      case "select":
-      case "datalist":
-      case "optgroup":
-      case "option":
-      case "textarea":
-      case "keygen":
-      case "output":
-      case "progress":
-      case "meter":
-      case "details":
-      case "summary":
-      case "menuitem":
-      case "menu":
-      case "canvas":
-      case "map":
-      case "area":
-      case "wbr":
-        return markNoneContent(node, noneContentList, "none content element");
-      case "img":
-      case "iframe":
-        if(node.isGoodImage || node.isVideo){
+    if(!node.isTopCandidate){
+      switch(tagName){
+        case "br":
           return;
-        } else {
-          return markNoneContent(node, noneContentList, "bad img/iframe");
-        }
-      case "embed":
-      case "object":
-      case "param":
-      case "video":
-      case "audio":
-      case "source":
-      case "track":
-      case "svg":
-      case "math":
-        return markNoneContent(node, noneContentList, "none content element(*)");//maybe support in the future
-      case "table":
-      case "h2":
-      case "h3":
-      case "h4":
-      case "h5":
-      case "h6":
-      case "em":
-      case "strong":
-      case "small":
-      case "s":
-      case "cite":
-      case "q":
-      case "dfn":
-      case "abbv":
-      case "data":
-      case "time":
-      case "code":
-      case "var":
-      case "samp":
-      case "kbd":
-      case "sub":
-      case "sup":
-      case "i":
-      case "b":
-      case "u":
-      case "mark":
-      case "ruby":
-      case "rt":
-      case "rp":
-      case "bdi":
-      case "figure":
-      case "figcaption":
-      case "li":
-      case "ul":
-      case "ol":
-        if(nodeIsVisible(node)){
-         break;
-        } else {
-         return markNoneContent(node, noneContentList, "invisible inline element");
-        }
-      case "a":
-        if((nodeIsVisible(node) && node.getAttribute('href') && node.getAttribute('href').indexOf("#") != 0) || nodeHasGoodMedia(node)){
-          break;
-        } else {
-          return markNoneContent(node, noneContentList, "invisible link or src=#");
-        }
-      case "td":
-      case "th":
-      case "tr":
-      case "tbody":
-      case "thead":
-      case "tfoot":
-      case "caption":
-      case "colgroup":
-      case "col":
-        break;
-      default:
-        if(!nodeIsVisible(node)){
-          return markNoneContent(node, noneContentList, "invisible element");
-        } else if(!nodeHasGoodMedia(node)) {
-          var wordCount = getWordCount(node.innerText);
-          if(nodeIsPositioned(node)){
-            return markNoneContent(node, noneContentList, "element is positioned");
-          } else if(nodeIsFloating(node)){
-            return markNoneContent(node, noneContentList, "element is floating");
-          } else if(isFontSizeSmaller(node) && wordCount < 40){
-            return markNoneContent(node, noneContentList, "element font size is smaller");
-          } else if(nodeHasLargerTagDensity(node) && wordCount < 100){
-            return markNoneContent(node, noneContentList, "element has larger tag density");
+        case "style":
+        case "script":
+        case "link":
+        case "noscript":
+        case "template":
+        case "nav":
+        case "h1":
+        case "footer":
+        case "address":
+        case "hr":
+        case "form":
+        case "fieldset":
+        case "legend":
+        case "label":
+        case "input":
+        case "button":
+        case "select":
+        case "datalist":
+        case "optgroup":
+        case "option":
+        case "textarea":
+        case "keygen":
+        case "output":
+        case "progress":
+        case "meter":
+        case "details":
+        case "summary":
+        case "menuitem":
+        case "menu":
+        case "canvas":
+        case "map":
+        case "area":
+        case "wbr":
+          return markNoneContent(node, noneContentList, "none content element");
+        case "img":
+        case "iframe":
+          if(node.isGoodImage || node.isVideo){
+            return;
+          } else {
+            return markNoneContent(node, noneContentList, "bad img/iframe");
           }
-        }
+        case "embed":
+        case "object":
+        case "param":
+        case "video":
+        case "audio":
+        case "source":
+        case "track":
+        case "svg":
+        case "math":
+          return markNoneContent(node, noneContentList, "none content element(*)");//maybe support in the future
+        case "table":
+        case "h2":
+        case "h3":
+        case "h4":
+        case "h5":
+        case "h6":
+        case "em":
+        case "strong":
+        case "small":
+        case "s":
+        case "cite":
+        case "q":
+        case "dfn":
+        case "abbv":
+        case "data":
+        case "time":
+        case "code":
+        case "var":
+        case "samp":
+        case "kbd":
+        case "sub":
+        case "sup":
+        case "i":
+        case "b":
+        case "u":
+        case "mark":
+        case "ruby":
+        case "rt":
+        case "rp":
+        case "bdi":
+        case "figure":
+        case "figcaption":
+        case "li":
+        case "ul":
+        case "ol":
+          if(nodeIsVisible(node)){
+           break;
+          } else {
+           return markNoneContent(node, noneContentList, "invisible inline element");
+          }
+        case "a":
+          if((nodeIsVisible(node) && node.getAttribute('href') && node.getAttribute('href').indexOf("#") != 0) || nodeHasGoodMedia(node)){
+            break;
+          } else {
+            return markNoneContent(node, noneContentList, "invisible link or src=#");
+          }
+        case "td":
+        case "th":
+        case "tr":
+        case "tbody":
+        case "thead":
+        case "tfoot":
+        case "caption":
+        case "colgroup":
+        case "col":
+          break;
+        default:
+          if(!nodeIsVisible(node)){
+            return markNoneContent(node, noneContentList, "invisible element");
+          } else if(nodeMaybeComment(node)){
+            return markNoneContent(node, noneContentList, "element might be a comment");
+          } else if(!nodeHasGoodMedia(node)) {
+            var wordCount = getWordCount(node.innerText);
+            if(nodeIsPositioned(node)){
+              return markNoneContent(node, noneContentList, "element is positioned");
+            } else if(nodeIsFloating(node)){
+              return markNoneContent(node, noneContentList, "element is floating");
+            } else if(isFontSizeSmaller(node) && wordCount < 40){
+              return markNoneContent(node, noneContentList, "element font size is smaller");
+            } else if(nodeHasLargerTagDensity(node) && wordCount < 100){
+              return markNoneContent(node, noneContentList, "element has larger tag density");
+            }
+          }
+      }
     }
 
     var children = node.children || [];
