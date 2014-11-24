@@ -43,7 +43,7 @@ var readify = function (){
         }
         var boundLookupRect = topCandidate.parentNode.getBoundingClientRect(), 
             curMediaRect, medias = videos.concat(goodImages), 
-            badMedia = Array.prototype.slice.call(document.body.querySelectorAll("a img, a iframe")),
+            badMedia = Array.prototype.slice.call(document.body.querySelectorAll("a img, a iframe, a embed")),
             curMedia = null,
             additionalMedia = null;
         for(i = medias.length - 1; i >= 0; --i){
@@ -53,7 +53,7 @@ var readify = function (){
              ((curMediaRect.left >= boundLookupRect.left && curMediaRect.right <= boundLookupRect.right) ||
               (curMediaRect.left <= boundLookupRect.left && curMediaRect.right >= boundLookupRect.right)) &&
              badMedia.indexOf(curMedia) == -1 &&
-             !topCandidate.parentNode.querySelector("img[src='" + curMedia.getAttribute("src") + "'], iframe[src='"+ curMedia.getAttribute("src") +"']")){
+             !topCandidate.parentNode.querySelector("[src='" + curMedia.getAttribute("src") + "']")){
             additionalMedia = medias[i];
             break;
           }
@@ -107,7 +107,7 @@ var readify = function (){
   var rateContent = function(){
     var i;
 
-    var nodesToScore = document.body.querySelectorAll("p, div, pre, section, article, blockquote, li, td, span, font, img, iframe, "
+    var nodesToScore = document.body.querySelectorAll("p, div, pre, section, article, blockquote, li, td, span, font, img, iframe, embed, "
                                                       + "em, strong, small, s, cite, q, dfn, abbv, data, time, code, var, samp, kbd, sub, sup, i, b, u, mark, ruby, rt, rp, bdi");
     var candidates = [];
 
@@ -122,7 +122,7 @@ var readify = function (){
         continue;
       }
 
-      if(tagName == "iframe" && isVideoUrl(curNode.src)){
+      if((tagName == "iframe" || tagName == "embed" ) && isVideoUrl(curNode.src)){
         curNode.isVideo = true;
         videos.push(curNode);
       } else if(tagName == "img" && isGoodImage(curNode)){
@@ -143,14 +143,28 @@ var readify = function (){
 
       score = 0;
 
+      if(nodeMaybeContent(curNode)){
+        score += 20;
+      }
+
+      var curNodeRect = curNode.getBoundingClientRect();
+
       if(curNode.isVideo || curNode.isGoodImage){
-        score += 40;
+        score += 20;
+        if(curNodeRect.width && curNodeRect.height){
+          curNode.dataset.ratio = curNodeRect.width / (curNodeRect.height);
+          if(curNodeRect.width > 500){
+            score += 20;
+          } else if(curNodeRect.width > 700){
+            score += 30;
+          }
+        }
       } else {
         score += getWordCount(getDirectInnerText(curNode));
       }
 
-      if(nodeMaybeComment(curNode)){
-        score *= 0.01;
+      if(nodeMaybeComment(curNode) || nodeMaybeNav(curNode) || nodeMaybeAd(curNode)){
+        score *= 0.1;
       }
 
       curNode.readify.score += score/2;
@@ -297,7 +311,6 @@ var readify = function (){
         case "map":
         case "area":
         case "wbr":
-        case "embed":
         case "object":
         case "param":
         case "video":
@@ -309,10 +322,11 @@ var readify = function (){
           return markNoneContent(node, noneContentList, "none content element");
         case "img":
         case "iframe":
+        case "embed":
           if(node.isGoodImage || node.isVideo){
             return;
           } else {
-            return markNoneContent(node, noneContentList, "bad img/iframe");
+            return markNoneContent(node, noneContentList, "bad img/iframe/embed");
           }
         case "table":
         case "h2":
@@ -374,7 +388,7 @@ var readify = function (){
           } else {
             
             if(nodeMaybeAd(node) || nodeMaybeNav(node)){
-              if(getLinkDensity(node) > 0.333333 || node.querySelectorAll("a img, iframe").length > 0){
+              if(getLinkDensity(node) > 0.333333 || node.querySelectorAll("a img, iframe, embed").length > 0){
                 return markNoneContent(node, noneContentList, "(ad|nav)");
               }
             }
@@ -515,6 +529,10 @@ var readify = function (){
            || /(pubdate|published.?date|date.?published|tmstmp|timestamp)/i.test(node.className + " " + node.id);
   }
 
+  var nodeMaybeContent = function(node){
+    return node.getAttribute("itemprop") == "articleBody" || /article|body|content|entry|hentry|main|page|post|text|blog|story/i.test(node.className + " " + node.id);
+  }
+
   var isVideoUrl = function(url){
     var videosRegex = [
       /^(https?:\/\/|\/\/)(www\.)?youtube\.com\/watch\?v=([^\&\?\/]+)/,
@@ -568,9 +586,9 @@ var readify = function (){
   }
 
   var nodeHasGoodMedia = function(node){
-    var iframes = node.getElementsByTagName('iframe'), images = node.getElementsByTagName('img');
-    for(var i = iframes.length - 1; i >=0; --i){
-      if(iframes[i].isVideo){
+    var videos = node.querySelectorAll('iframe, embed'), images = node.getElementsByTagName('img');
+    for(var i = videos.length - 1; i >=0; --i){
+      if(videos[i].isVideo){
         return true;
       }
     }
