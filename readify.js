@@ -205,118 +205,10 @@ var readify = function (){
     return docTitle;
   }
 
-  var initNode = function(node){
-    if(!node.readify){
-      node.readify = { score: 0, wordCount: 0, linkDensity: 0 };
-    }
-  }
-
-  var getDirectInnerText = function(node){
-    var i, l, curChildNode, text = "";
-    for(curChildNode = node.firstChild; !!curChildNode; curChildNode = curChildNode.nextSibling){
-      if(curChildNode.nodeType == Node.TEXT_NODE){
-        text += curChildNode.nodeValue;
-      }
-    }
-    return text;
-  }
-
-  var getWordCount = function(str){
-    var matches = str.match(/\S+/g);
-    return matches && matches.length || 0;
-  }
-
-  var getLinkDensity = function(node){
-    var links = node.getElementsByTagName("a");
-    var linkWordCount = 0;
-    for(i = links.length - 1; i >= 0 ; --i){
-      linkWordCount += getWordCount(links[i].innerText);
-    }
-    var textWordCount = getWordCount(node.innerText) - linkWordCount;
-    if(textWordCount == 0){
-      return linkWordCount > 0 ? 1 : 0;
-    } else {
-      return linkWordCount / textWordCount;
-    }
-  }
-
-  var getTagDensity = function(node){
-    var textWordCount = getWordCount(node.innerText);
-    var tagCount = node.getElementsByTagName("*").length;
-    if(textWordCount == 0){
-      return tagCount > 0 ? 1 : 0;
-    } else {
-      return tagCount / textWordCount;
-    }
-  }
-
-  var nodeIsVisible = function(node){
-    var style = getComputedStyle(node);
-    var rect = node.getBoundingClientRect(node);
-    var parentNode = node.parentNode;
-    if(parentNode == document.body){
-      parentNode = null;
-    }
-    return  style.getPropertyValue("display").toLowerCase() != 'none' &&
-            style.getPropertyValue("visibility").toLowerCase() != 'hidden' &&
-            ((node.childNodes.length > 0 && style.getPropertyValue("overflow") != "hidden") || (rect.width > 1 && rect.height > 1)) &&
-            (!parentNode || (parentNode && nodeIsVisible(parentNode)));
-  }
-
-  var getAggragatedScore = function(node){
-    var score = 0, children = node.children || [];
-    if(children.length){
-      for(var i = children.length - 1; i >= 0; --i){
-        score += getAggragatedScore(children[i]);
-      }
-    } 
-    score += (node.readify && node.readify.score) || 0;
-    return score;
-  }
-
-  var nodeMaybeComment = function(node){
-    return /(comment|talkback|reply|replies|discuss)/i.test(node.className + node.id);
-  }
-
-  var langIsRTL = function(sampleText) {
-    var t = sampleText.replace(/@\w+/, ''),
-        countHeb = countMatches('[\\u05B0-\\u05F4\\uFB1D-\\uFBF4]'),
-        countArb = countMatches('[\\u060C-\\u06FE\\uFB50-\\uFEFC]');
-
-    function countMatches (match) {
-        var matches = t.match(new RegExp(match, 'g'));
-        return matches !== null ? matches.length : 0;
-    }
-
-    return (countHeb + countArb) * 100 / t.length > 20;
-  }
-
-  var scrollInSteps = function(y, step, callback){
-    if(y == window.scrollY){
-      return callback();
-    } else if(y < window.scrollY){
-      step = -step;
-    }
-    if(Math.abs(window.scrollY - y) < Math.abs(step)){
-      window.scrollTo(0, y);
-      callback();
-    } else {
-      window.scrollTo(0, window.scrollY + step);
-      setTimeout(function(){ scrollInSteps(y, step, callback) }, 10);
-    }
-  }
-
-  var removeNode = function(node){
-    var parentNode = node.parentNode;
-    if(parentNode){
-      parentNode.removeChild(node);
-    }
-  }
-
   var removeNoneContent = function(articleContents, topCandidate){
     var i, noneContent = [];
     for(i = articleContents.length -1; i >= 0; --i ){
-      grabNoneContent(articleContents[i], noneContent);
+      grabNoneContent(articleContents[i], noneContent, topCandidate);
     }
 
     var toRemoveNode, contentIndex;
@@ -350,132 +242,7 @@ var readify = function (){
     }
   }
 
-  var compEnv = function(node, predicate){
-    var previous = node.previousElementSibling,
-        prevPrevious = previous && previous.previousElementSibling,
-        next = node.nextElementSibling,
-        nextNext = next && next.nextElementSibling;
-    if(previous && next){
-      return predicate(node, previous, next);
-    } else if(previous && prevPrevious){
-      return predicate(node, previous, prevPrevious);
-    } else if(next && nextNext){
-      return predicate(node, next, nextNext);
-    } else {
-      return predicate(node, previous, next);
-    }
-  }
-
-  var isFontSizeSmaller = function(node){
-    return compEnv(node, function(n, a, b){
-      if(a && b){
-        var nFontSize = parseFloat(getComputedStyle(n).getPropertyValue("font-size"));
-        var aFontSize = parseFloat(getComputedStyle(a).getPropertyValue("font-size"));
-        var bFontSize = parseFloat(getComputedStyle(b).getPropertyValue("font-size"));
-        return nFontSize < aFontSize && nFontSize < bFontSize;
-      } else {
-        return false;
-      }
-    });
-  }
-
-  var nodeIsPositioned = function(node){
-    return compEnv(node, function(n, a, b){
-      var nPosition = getComputedStyle(n).getPropertyValue("position") == "absolute";
-      var aPosition = a && getComputedStyle(a).getPropertyValue("position") == "absolute";
-      var bPosition = b && getComputedStyle(b).getPropertyValue("position") == "absolute";
-      return nPosition && !(aPosition && bPosition );
-    });
-  }
-
-  var nodeIsFloating = function(node){
-    return compEnv(node, function(n, a, b){
-      var nFloat = getComputedStyle(n).getPropertyValue("float") != "none";
-      var aFloat = a && getComputedStyle(a).getPropertyValue("float") != "none";
-      var bFloat = b && getComputedStyle(b).getPropertyValue("float") != "none";
-      return nFloat && !(aFloat && bFloat);
-    });
-  }
-
-  var nodeHasLargerTagDensity = function(node){
-    return compEnv(node, function(n, a, b){
-      return getTagDensity(n) > 1 && ((a && getTagDensity(a) < 1) || (b && getTagDensity(b) < 1));
-    });
-  }
-
-  var isVideoUrl = function(url){
-    var videosRegex = [
-      /^(https?:\/\/|\/\/)(www\.)?youtube\.com\/watch\?v=([^\&\?\/]+)/,
-      /^(http(s)?:\/\/|\/\/)(www\.)?youtube\.com\/embed\/([^\&\?\/]+)/,
-      /^(http(s)?:\/\/|\/\/)(www\.)?youtube\.com\/v\/([^\&\?\/]+)/,
-      /^(http(s)?:\/\/|\/\/)youtu\.be\/([^\&\?\/]+)/,
-      /^(https?:\/\/|\/\/)(www\.)?rutube\.ru\/video\/(\w+)/,
-      /^(https?:\/\/|\/\/)(www\.)?rutube\.ru\/play\/embed\/(\w+)/, 
-      /^(https?:\/\/|\/\/)(www\.)?dailymotion.com\/video\/([\w-]+)/, 
-      /^(https?:\/\/|\/\/)(www\.)?dailymotion.com\/embed\/video\/([\w-]+)/, 
-      /^(https?:\/\/|\/\/)dai.ly\/([\w-]+)/, 
-      /^(https?:\/\/|\/\/)(www\.)?metacafe.com\/watch\/([\w-]+)/, 
-      /^(https?:\/\/|\/\/)(www\.)?metacafe.com\/fplayer\/(\w+)\/metacafe.swf/, 
-      /^(https?:\/\/|\/\/)(www\.)?metacafe.com\/embed\/([\w-]+)/, 
-      /^(https?:\/\/|\/\/)(www\.)?vine\.co\/v\/(\w+)/, 
-      /^(https?:\/\/|\/\/)(www\.)?vine\.co\/v\/(\w+)\/embed/, 
-      /^(https?:\/\/|\/\/)(www\.)?instagram\.com\/p\/([\w\-]+)/, 
-      /^(https?:\/\/|\/\/)(www\.)?instagram\.com\/p\/([\w\-]+)\/embed/,
-      /^(https?:\/\/|\/\/)player\.vimeo\.com\/video\/.*/
-    ];
-    var match = false;
-    for(var i = videosRegex.length - 1; i >=0; --i ){
-      if(videosRegex[i].test(url)){
-        match = true;
-        break;
-      }
-    }
-    return match;
-  }
-
-  var isGoodImage = function(img){
-    var minRatio = 1/9, maxRatio = 3;
-    var width = img.width;
-    var height = img.height;
-    if(img.src && width > 200 && height > 100){
-      var curRatio = width / height;
-      if(curRatio > minRatio && curRatio < maxRatio){
-        return true;
-      }
-    }
-    return false;
-  }
-
-  var getOgVideo = function(){
-    var ogVideoMeta = document.querySelector('[property="og:video"]');
-    if(ogVideoMeta && isVideoUrl(ogVideoMeta.getAttribute("content"))){
-      var video = document.createElement("iframe");
-      video.src = ogVideoMeta.getAttribute("content");
-      return video;
-    }
-  }
-
-  var nodeHasGoodMedia = function(node){
-    var iframes = node.getElementsByTagName('iframe'), images = node.getElementsByTagName('img');
-    for(var i = iframes.length - 1; i >=0; --i){
-      if(iframes[i].isVideo){
-        return true;
-      }
-    }
-    for(i = images.length - 1; i>= 0; --i){
-      if(images[i].isGoodImage){
-        return true;
-      }
-    }
-    return false;
-  }
-
-  var markNoneContent = function(node, noneContentList, reason){
-    dbg("none content: " + eToS(node) + " reason: " + reason);
-    noneContentList.push(node);
-  };
-
-  var grabNoneContent = function(node, noneContentList){
+  var grabNoneContent = function(node, noneContentList, topCandidate){
     var linkDensity, tagName = node.nodeName.toLowerCase();
     if(!node.isTopCandidate){
       switch(tagName){
@@ -610,7 +377,248 @@ var readify = function (){
 
     var children = node.children || [];
     for( var i = children.length - 1; i >= 0; --i){
-      grabNoneContent(children[i], noneContentList);
+      grabNoneContent(children[i], noneContentList, topCandidate);
+    }
+  }
+
+  var initNode = function(node){
+    if(!node.readify){
+      node.readify = { score: 0, wordCount: 0, linkDensity: 0 };
+    }
+  }
+
+  var getDirectInnerText = function(node){
+    var i, l, curChildNode, text = "";
+    for(curChildNode = node.firstChild; !!curChildNode; curChildNode = curChildNode.nextSibling){
+      if(curChildNode.nodeType == Node.TEXT_NODE){
+        text += curChildNode.nodeValue;
+      }
+    }
+    return text;
+  }
+
+  var getWordCount = function(str){
+    var matches = str.match(/\S+/g);
+    return matches && matches.length || 0;
+  }
+
+  var getLinkDensity = function(node){
+    var links = node.getElementsByTagName("a");
+    var linkWordCount = 0;
+    for(i = links.length - 1; i >= 0 ; --i){
+      linkWordCount += getWordCount(links[i].innerText);
+    }
+    var textWordCount = getWordCount(node.innerText) - linkWordCount;
+    if(textWordCount == 0){
+      return linkWordCount > 0 ? 1 : 0;
+    } else {
+      return linkWordCount / textWordCount;
+    }
+  }
+
+  var getTagDensity = function(node){
+    var textWordCount = getWordCount(node.innerText);
+    var tagCount = node.getElementsByTagName("*").length;
+    if(textWordCount == 0){
+      return tagCount > 0 ? 1 : 0;
+    } else {
+      return tagCount / textWordCount;
+    }
+  }
+
+  var nodeIsVisible = function(node){
+    var style = getComputedStyle(node);
+    var rect = node.getBoundingClientRect(node);
+    var parentNode = node.parentNode;
+    if(parentNode == document.body){
+      parentNode = null;
+    }
+    return  style.getPropertyValue("display").toLowerCase() != 'none' &&
+            style.getPropertyValue("visibility").toLowerCase() != 'hidden' &&
+            ((node.childNodes.length > 0 && style.getPropertyValue("overflow") != "hidden") || (rect.width > 1 && rect.height > 1)) &&
+            (!parentNode || (parentNode && nodeIsVisible(parentNode)));
+  }
+
+  var getAggragatedScore = function(node){
+    var score = 0, children = node.children || [];
+    if(children.length){
+      for(var i = children.length - 1; i >= 0; --i){
+        score += getAggragatedScore(children[i]);
+      }
+    } 
+    score += (node.readify && node.readify.score) || 0;
+    return score;
+  }
+
+  var nodeMaybeComment = function(node){
+    return /(comment|talkback|reply|replies|discuss)/i.test(node.className + node.id);
+  }
+
+  var nodeMaybeAd = function(node){
+    return /([ _-]ad[ _-]|adsense|promo|sponsor)/i.test(node.className +" "+ node.id);
+  }
+
+  var nodeMaybeNav = function(node){
+    return /(related|tags|sidebar|outbrain)/i.test(node.className + " " + node.id);
+  }
+
+  var isVideoUrl = function(url){
+    var videosRegex = [
+      /^(https?:\/\/|\/\/)(www\.)?youtube\.com\/watch\?v=([^\&\?\/]+)/,
+      /^(http(s)?:\/\/|\/\/)(www\.)?youtube\.com\/embed\/([^\&\?\/]+)/,
+      /^(http(s)?:\/\/|\/\/)(www\.)?youtube\.com\/v\/([^\&\?\/]+)/,
+      /^(http(s)?:\/\/|\/\/)youtu\.be\/([^\&\?\/]+)/,
+      /^(https?:\/\/|\/\/)(www\.)?rutube\.ru\/video\/(\w+)/,
+      /^(https?:\/\/|\/\/)(www\.)?rutube\.ru\/play\/embed\/(\w+)/, 
+      /^(https?:\/\/|\/\/)(www\.)?dailymotion.com\/video\/([\w-]+)/, 
+      /^(https?:\/\/|\/\/)(www\.)?dailymotion.com\/embed\/video\/([\w-]+)/, 
+      /^(https?:\/\/|\/\/)dai.ly\/([\w-]+)/, 
+      /^(https?:\/\/|\/\/)(www\.)?metacafe.com\/watch\/([\w-]+)/, 
+      /^(https?:\/\/|\/\/)(www\.)?metacafe.com\/fplayer\/(\w+)\/metacafe.swf/, 
+      /^(https?:\/\/|\/\/)(www\.)?metacafe.com\/embed\/([\w-]+)/, 
+      /^(https?:\/\/|\/\/)(www\.)?vine\.co\/v\/(\w+)/, 
+      /^(https?:\/\/|\/\/)(www\.)?vine\.co\/v\/(\w+)\/embed/, 
+      /^(https?:\/\/|\/\/)(www\.)?instagram\.com\/p\/([\w\-]+)/, 
+      /^(https?:\/\/|\/\/)(www\.)?instagram\.com\/p\/([\w\-]+)\/embed/,
+      /^(https?:\/\/|\/\/)player\.vimeo\.com\/video\/.*/
+    ];
+    var match = false;
+    for(var i = videosRegex.length - 1; i >=0; --i ){
+      if(videosRegex[i].test(url)){
+        match = true;
+        break;
+      }
+    }
+    return match;
+  }
+
+  var isGoodImage = function(img){
+    var minRatio = 1/9, maxRatio = 3;
+    var width = img.width;
+    var height = img.height;
+    if(img.src && width > 200 && height > 100){
+      var curRatio = width / height;
+      if(curRatio > minRatio && curRatio < maxRatio){
+        return true;
+      }
+    }
+    return false;
+  }
+
+  var getOgVideo = function(){
+    var ogVideoMeta = document.querySelector('[property="og:video"]');
+    if(ogVideoMeta && isVideoUrl(ogVideoMeta.getAttribute("content"))){
+      var video = document.createElement("iframe");
+      video.src = ogVideoMeta.getAttribute("content");
+      return video;
+    }
+  }
+
+  var nodeHasGoodMedia = function(node){
+    var iframes = node.getElementsByTagName('iframe'), images = node.getElementsByTagName('img');
+    for(var i = iframes.length - 1; i >=0; --i){
+      if(iframes[i].isVideo){
+        return true;
+      }
+    }
+    for(i = images.length - 1; i>= 0; --i){
+      if(images[i].isGoodImage){
+        return true;
+      }
+    }
+    return false;
+  }
+
+  var compEnv = function(node, predicate){
+    var previous = node.previousElementSibling,
+        prevPrevious = previous && previous.previousElementSibling,
+        next = node.nextElementSibling,
+        nextNext = next && next.nextElementSibling;
+    if(previous && next){
+      return predicate(node, previous, next);
+    } else if(previous && prevPrevious){
+      return predicate(node, previous, prevPrevious);
+    } else if(next && nextNext){
+      return predicate(node, next, nextNext);
+    } else {
+      return predicate(node, previous, next);
+    }
+  }
+
+  var isFontSizeSmaller = function(node){
+    return compEnv(node, function(n, a, b){
+      if(a && b){
+        var nFontSize = parseFloat(getComputedStyle(n).getPropertyValue("font-size"));
+        var aFontSize = parseFloat(getComputedStyle(a).getPropertyValue("font-size"));
+        var bFontSize = parseFloat(getComputedStyle(b).getPropertyValue("font-size"));
+        return nFontSize < aFontSize && nFontSize < bFontSize;
+      } else {
+        return false;
+      }
+    });
+  }
+
+  var nodeIsPositioned = function(node){
+    return compEnv(node, function(n, a, b){
+      var nPosition = getComputedStyle(n).getPropertyValue("position") == "absolute";
+      var aPosition = a && getComputedStyle(a).getPropertyValue("position") == "absolute";
+      var bPosition = b && getComputedStyle(b).getPropertyValue("position") == "absolute";
+      return nPosition && !(aPosition && bPosition );
+    });
+  }
+
+  var nodeIsFloating = function(node){
+    return compEnv(node, function(n, a, b){
+      var nFloat = getComputedStyle(n).getPropertyValue("float") != "none";
+      var aFloat = a && getComputedStyle(a).getPropertyValue("float") != "none";
+      var bFloat = b && getComputedStyle(b).getPropertyValue("float") != "none";
+      return nFloat && !(aFloat && bFloat);
+    });
+  }
+
+  var nodeHasLargerTagDensity = function(node){
+    return compEnv(node, function(n, a, b){
+      return getTagDensity(n) > 1 && ((a && getTagDensity(a) < 1) || (b && getTagDensity(b) < 1));
+    });
+  }
+
+  var markNoneContent = function(node, noneContentList, reason){
+    dbg("none content: " + eToS(node) + " reason: " + reason);
+    noneContentList.push(node);
+  };
+
+  var langIsRTL = function(sampleText) {
+    var t = sampleText.replace(/@\w+/, ''),
+        countHeb = countMatches('[\\u05B0-\\u05F4\\uFB1D-\\uFBF4]'),
+        countArb = countMatches('[\\u060C-\\u06FE\\uFB50-\\uFEFC]');
+
+    function countMatches (match) {
+        var matches = t.match(new RegExp(match, 'g'));
+        return matches !== null ? matches.length : 0;
+    }
+
+    return (countHeb + countArb) * 100 / t.length > 20;
+  }
+
+  var scrollInSteps = function(y, step, callback){
+    if(y == window.scrollY){
+      return callback();
+    } else if(y < window.scrollY){
+      step = -step;
+    }
+    if(Math.abs(window.scrollY - y) < Math.abs(step)){
+      window.scrollTo(0, y);
+      callback();
+    } else {
+      window.scrollTo(0, window.scrollY + step);
+      setTimeout(function(){ scrollInSteps(y, step, callback) }, 10);
+    }
+  }
+
+  var removeNode = function(node){
+    var parentNode = node.parentNode;
+    if(parentNode){
+      parentNode.removeChild(node);
     }
   }
 
