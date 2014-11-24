@@ -25,10 +25,15 @@ var readify = function (){
 
       var articleContents = [], articleTitle = "";
       if(topCandidate){
-        var sibling, topCandidateSiblings = Array.prototype.slice.call(topCandidate.parentNode.children);
+        var sibling,
+            topCandidateMaybeComment = nodeMaybeComment(topCandidate),
+            topCandidateSiblings = Array.prototype.slice.call(topCandidate.parentNode.children);
         for(i = topCandidateSiblings.length - 1; i >= 0 ; --i){
           sibling = topCandidateSiblings[i];
-          if(sibling === topCandidate || getAggragatedScore(sibling) >= 3){
+          if(sibling === topCandidate || 
+            (getAggragatedScore(sibling) >= 3 && 
+              (topCandidateMaybeComment || 
+              (!topCandidateMaybeComment && !nodeMaybeComment(sibling))))){
             articleContents.unshift(sibling);
             (sibling != topCandidate) && dbg("Added sibling "+ eToS(sibling));
           }
@@ -129,6 +134,10 @@ var readify = function (){
         score += getWordCount(getDirectInnerText(curNode));
       }
 
+      if(nodeMaybeComment(curNode)){
+        score *= 0.01;
+      }
+
       curNode.readify.score += score;
 
       if(curNode.readify.score > 0){
@@ -154,7 +163,6 @@ var readify = function (){
       }
       for(i = candidates.length - 1; i >= 0; --i){
         curCandidate = candidates[i];
-        curCandidate.readify.score >= 20 && dbg("candidate: " + eToS(curCandidate) + " score: " + curCandidate.readify.score + " lookupLimitTop: " + lookupLimitTop);
         if(!topCandidate || ((curCandidate.readify.score > topCandidate.readify.score) && (!lookupLimitTop || (lookupLimitTop && (curCandidate.getBoundingClientRect().top < lookupLimitTop))) )){
           topCandidate = curCandidate;
           dbg("topCandidate: " + eToS(topCandidate) + " score: " + topCandidate.readify.score + " lookupLimitTop: " + lookupLimitTop);
@@ -261,6 +269,10 @@ var readify = function (){
     } 
     score += (node.readify && node.readify.score) || 0;
     return score;
+  }
+
+  var nodeMaybeComment = function(node){
+    return /(comment|talkback|reply|replies|discuss)/i.test(node.className + node.id);
   }
 
   var langIsRTL = function(sampleText) {
