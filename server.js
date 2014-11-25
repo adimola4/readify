@@ -20,7 +20,7 @@ var configPage = function(page, send, timedOut){
 
   page.settings.userAgent = "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36";
 
-  page.settings.resourceTimeout = 2000;
+  page.settings.resourceTimeout = 2500;
 
   page.viewportSize = { width: 1920, height: 1080 }
 
@@ -28,7 +28,20 @@ var configPage = function(page, send, timedOut){
 
   page.onCallback = function(msg){
     switch(msg.action){
-
+      case "runReadify":
+        if(!timedOut.already && !page.stopping){
+          page.render("webpage.png");
+          page.injectJs('benchmark.js');
+          var out = page.evaluate(readify);
+          if(out && typeof out == "object"){
+            send(200, JSON.stringify(out), true);
+          } else {
+            send(500, toHTML("no content"));
+          }
+          closePage(page);
+        } else if(!page.stopping){
+          closePage(page);
+        }
     }
   }
 
@@ -86,15 +99,26 @@ var openPageAndReadify = function(url, send, timedOut){
       if(!timedOut.already && !page.stopping){
         console.log("Benchmark - " + page.url + " open: " + ( (new Date).getTime() - startedAt.getTime() ) + "ms");
         if(!isUrlRedirecting(page.url)){
-          page.render("webpage.png");
-          page.injectJs('benchmark.js');
-          var out = page.evaluate(readify);
-          if(out && typeof out == "object"){
-            send(200, JSON.stringify(out), true);
-          } else {
-            send(500, toHTML("no content"));
-          }
-          closePage(page);
+          page.evaluate(function(){
+              var scrollInSteps = function(y, step, callback){
+                if(y == window.scrollY){
+                  return callback();
+                } else if(y < window.scrollY){
+                  step = -step;
+                }
+                if(Math.abs(window.scrollY - y) < Math.abs(step)){
+                  window.scrollTo(0, y);
+                  callback();
+                } else {
+                  window.scrollTo(0, window.scrollY + step);
+                  setTimeout(function(){ scrollInSteps(y, step, callback) }, 5);
+                }
+              }
+            scrollInSteps(document.body.clientHeight - window.innerHeight, 500, function(){
+              window.scrollTo(0,0);
+              window.callPhantom({ action: "runReadify" });
+            });
+          });
         }
       } else if(!page.stopping){
         closePage(page);

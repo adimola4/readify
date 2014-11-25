@@ -12,7 +12,6 @@ var readify = function (){
     try {
       var i;
 
-      //scrollInSteps(document.body.clientHeight - window.innerHeight, 500, function(){ window.scrollTo(0,0) });
       window.scrollTo(0, 100);
       window.scrollTo(0, 0);
 
@@ -144,7 +143,7 @@ var readify = function (){
       score = 0;
 
       if(nodeMaybeContent(curNode)){
-        score += 20;
+        score += 10;
       }
 
       var curNodeRect = curNode.getBoundingClientRect();
@@ -153,9 +152,9 @@ var readify = function (){
         score += 20;
         if(curNodeRect.width && curNodeRect.height){
           curNode.dataset.ratio = curNodeRect.width / (curNodeRect.height);
-          if(curNodeRect.width > 500){
+          if(curNodeRect.width > 500 && curNodeRect.height >= 250){
             score += 20;
-          } else if(curNodeRect.width > 700){
+          } else if(curNodeRect.width > 700 && curNodeRect.height >= 350){
             score += 30;
           }
         }
@@ -530,7 +529,7 @@ var readify = function (){
   }
 
   var nodeMaybeContent = function(node){
-    return node.getAttribute("itemprop") == "articleBody" || /article|body|content|entry|hentry|main|page|post|text|blog|story/i.test(node.className + " " + node.id);
+    return node.getAttribute("itemprop") == "articleBody" || /article|entry|hentry|main|story/i.test(node.className + " " + node.id);
   }
 
   var isVideoUrl = function(url){
@@ -645,21 +644,6 @@ var readify = function (){
     }
 
     return (countHeb + countArb) * 100 / t.length > 20;
-  }
-
-  var scrollInSteps = function(y, step, callback){
-    if(y == window.scrollY){
-      return callback();
-    } else if(y < window.scrollY){
-      step = -step;
-    }
-    if(Math.abs(window.scrollY - y) < Math.abs(step)){
-      window.scrollTo(0, y);
-      callback();
-    } else {
-      window.scrollTo(0, window.scrollY + step);
-      setTimeout(function(){ scrollInSteps(y, step, callback) }, 10);
-    }
   }
 
   var removeNode = function(node){
