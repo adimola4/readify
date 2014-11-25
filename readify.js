@@ -22,7 +22,7 @@ var readify = function (){
           videos = rating.videos,
           goodImages = rating.goodImages;
 
-      var articleContents = [], articleTitle = "";
+      var articleContents = [], articleTitle = "", article = document.createElement("div");
       if(topCandidate){
         var sibling,
             siblingRect,
@@ -86,14 +86,14 @@ var readify = function (){
         }
       }
 
-      if((topCandidate && topCandidate.readify.score < 20 || !topCandidate) && videos.length == 0 && goodImages.length == 0 && !ogVideo){
+      for(i = articleContents.length -1; i >=0; --i){
+        article.insertBefore(articleContents[i],article.lastChild);
+      }
+
+      if(getWordCount(article.innerText) < 20 && !nodeHasGoodMedia(article)){
         var content = null;
       } else {
-        var content = "";
-        for(i = articleContents.length -1; i >=0; --i){
-          content = articleContents[i].outerHTML + content;
-        }
-        content = killBrs(content);
+        content = killBrs(article.innerHTML);
       }
 
       return content && { title: articleTitle, content: content, url: location.href, isRTL: langIsRTL(topCandidate.innerText || "abc")};
@@ -149,13 +149,13 @@ var readify = function (){
       var curNodeRect = curNode.getBoundingClientRect();
 
       if(curNode.isVideo || curNode.isGoodImage){
-        score += 20;
+        score += 10;
         if(curNodeRect.width && curNodeRect.height){
           curNode.dataset.ratio = curNodeRect.width / (curNodeRect.height);
           if(curNodeRect.width > 500 && curNodeRect.height >= 250){
-            score += 20;
+            score += 10;
           } else if(curNodeRect.width > 700 && curNodeRect.height >= 350){
-            score += 30;
+            score += 15;
           }
         }
       } else {
@@ -512,7 +512,7 @@ var readify = function (){
   }
 
   var nodeMaybeNav = function(node){
-    return /(related|tags|sidebar|outbrain|recommend|tools|navbar)/i.test(node.className + " " + node.id);
+    return /(related|similar|tags|sidebar|outbrain|recommend|tools|navbar)/i.test(node.className + " " + node.id);
   }
 
   var nodeMaybeShareTools = function(node){
@@ -525,11 +525,11 @@ var readify = function (){
 
   var nodeMaybePubDate = function(node){
     return node.getAttribute("itemprop") == "datePublished" || node.getAttribute("itemprop") == "dateCreated" || node.getAttribute("itemprop") == "dateModified"
-           || /(pubdate|published.?date|date.?published|tmstmp|timestamp)/i.test(node.className + " " + node.id);
+           || /(pubdate|pubtime|published.?date|published.?time|posted.?date|posted.?time|date.?published|time.?published|tmstmp|timestamp)/i.test(node.className + " " + node.id);
   }
 
   var nodeMaybeContent = function(node){
-    return node.getAttribute("itemprop") == "articleBody" || /article|entry|hentry|main|story/i.test(node.className + " " + node.id);
+    return node.getAttribute("itemprop") == "articleBody";
   }
 
   var isVideoUrl = function(url){
@@ -579,7 +579,13 @@ var readify = function (){
     var ogVideoMeta = document.querySelector('[property="og:video"]');
     if(ogVideoMeta && isVideoUrl(ogVideoMeta.getAttribute("content"))){
       var video = document.createElement("iframe");
+      video.isVideo = true;
       video.src = ogVideoMeta.getAttribute("content");
+      var width = document.querySelector('[property="og:video:width"]');
+      width = width && parseFloat(width.getAttribute("content"));
+      var height = document.querySelector('[property="og:height"]');
+      height = height && parseFloat(height.getAttribute("content"));
+      video.dataset.ratio = (width && height && width/height) || null;
       return video;
     }
   }

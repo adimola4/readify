@@ -20,8 +20,6 @@ var configPage = function(page, send, timedOut){
 
   page.settings.userAgent = "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36";
 
-  page.settings.resourceTimeout = 2500;
-
   page.viewportSize = { width: 1920, height: 1080 }
 
   page.iframeUrls = [];
