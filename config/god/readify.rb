@@ -55,7 +55,7 @@ project_root  = ENV['ROOT'] || "/home/deploy/readify/current"
         c.port = port
         c.path = '/test'  
         c.code_is_not = 200
-        c.timeout = 10.seconds
+        c.timeout = 5.seconds
         c.times = [3, 5]
       end
     end

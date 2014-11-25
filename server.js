@@ -28,7 +28,6 @@ var configPage = function(page, send, timedOut){
     switch(msg.action){
       case "runReadify":
         if(!timedOut.already && !page.stopping){
-          page.render("webpage.png");
           page.injectJs('benchmark.js');
           var out = page.evaluate(readify);
           if(out && typeof out == "object"){
