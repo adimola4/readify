@@ -176,7 +176,7 @@ function onRequest(req, res) {
 
   if(url.pathname == "/test"){
     var testPage = webpage.create();
-    testPage.open("http://www.google.com/", function(){
+    testPage.open("https://www.google.com/", function(){
       if(testPage.evaluate(function(){ return true; })){
         send(200, toHTML("Test is OK"));
       } else {  

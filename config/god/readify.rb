@@ -50,13 +50,13 @@ project_root  = ENV['ROOT'] || "/home/deploy/readify/current"
       end
 
       on.condition(:http_response_code) do |c|
-        c.interval = 10
+        c.interval = 30
         c.host = 'localhost'
         c.port = port
         c.path = '/test'  
         c.code_is_not = 200
-        c.timeout = 5.seconds
-        c.times = [3, 5]
+        c.timeout = 10.seconds
+        c.times = [2, 3]
       end
     end
 
