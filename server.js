@@ -80,10 +80,8 @@ var configPage = function(page, send, timedOut){
   }
 
   page.onError = function (msg, trace) {
-    dbg(msg);
-    trace.forEach(function(item) {
-      dbg('  ', item.file, ':', item.line);
-    });
+    dbg("error catched! " + msg + " trace " + JSON.stringify(trace));
+    page.onCallback({ action: "runReadify"});
   }
 }
 
