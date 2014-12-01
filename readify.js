@@ -532,26 +532,26 @@ var readify = function (){
     return node.getAttribute("itemprop") == "articleBody";
   }
 
+  var videosRegex = [
+    /^(?:https?:\/\/|\/\/)(?:www\.)?youtube\.com\/watch\?v=([^\&\?\/]+)/,
+    /^(?:https?:\/\/|\/\/)(?:www\.)?youtube\.com\/embed\/([^\&\?\/]+)/,
+    /^(?:https?:\/\/|\/\/)(?:www\.)?youtube\.com\/v\/([^\&\?\/]+)/,
+    /^(?:https?:\/\/|\/\/)youtu\.be\/([^\&\?\/]+)/,
+    /^(?:https?:\/\/|\/\/)(?:www\.)?rutube\.ru\/video\/(\w+)/,
+    /^(?:https?:\/\/|\/\/)(?:www\.)?rutube\.ru\/play\/embed\/(\w+)/, 
+    /^(?:https?:\/\/|\/\/)(?:www\.)?dailymotion.com\/video\/([\w-]+)/, 
+    /^(?:https?:\/\/|\/\/)(?:www\.)?dailymotion.com\/embed\/video\/([\w-]+)/, 
+    /^(?:https?:\/\/|\/\/)dai.ly\/([\w-]+)/, 
+    /^(?:https?:\/\/|\/\/)(?:www\.)?metacafe.com\/watch\/([\w-]+)/, 
+    /^(?:https?:\/\/|\/\/)(?:www\.)?metacafe.com\/fplayer\/(\w+)\/metacafe.swf/, 
+    /^(?:https?:\/\/|\/\/)(?:www\.)?metacafe.com\/embed\/([\w-]+)/, 
+    /^(?:https?:\/\/|\/\/)(?:www\.)?vine\.co\/v\/(\w+)/, 
+    /^(?:https?:\/\/|\/\/)(?:www\.)?vine\.co\/v\/(\w+)\/embed/, 
+    /^(?:https?:\/\/|\/\/)(?:www\.)?instagram\.com\/p\/([\w\-]+)/, 
+    /^(?:https?:\/\/|\/\/)(?:www\.)?instagram\.com\/p\/([\w\-]+)\/embed/
+  ];
+
   var isVideoUrl = function(url){
-    var videosRegex = [
-      /^(https?:\/\/|\/\/)(www\.)?youtube\.com\/watch\?v=([^\&\?\/]+)/,
-      /^(http(s)?:\/\/|\/\/)(www\.)?youtube\.com\/embed\/([^\&\?\/]+)/,
-      /^(http(s)?:\/\/|\/\/)(www\.)?youtube\.com\/v\/([^\&\?\/]+)/,
-      /^(http(s)?:\/\/|\/\/)youtu\.be\/([^\&\?\/]+)/,
-      /^(https?:\/\/|\/\/)(www\.)?rutube\.ru\/video\/(\w+)/,
-      /^(https?:\/\/|\/\/)(www\.)?rutube\.ru\/play\/embed\/(\w+)/, 
-      /^(https?:\/\/|\/\/)(www\.)?dailymotion.com\/video\/([\w-]+)/, 
-      /^(https?:\/\/|\/\/)(www\.)?dailymotion.com\/embed\/video\/([\w-]+)/, 
-      /^(https?:\/\/|\/\/)dai.ly\/([\w-]+)/, 
-      /^(https?:\/\/|\/\/)(www\.)?metacafe.com\/watch\/([\w-]+)/, 
-      /^(https?:\/\/|\/\/)(www\.)?metacafe.com\/fplayer\/(\w+)\/metacafe.swf/, 
-      /^(https?:\/\/|\/\/)(www\.)?metacafe.com\/embed\/([\w-]+)/, 
-      /^(https?:\/\/|\/\/)(www\.)?vine\.co\/v\/(\w+)/, 
-      /^(https?:\/\/|\/\/)(www\.)?vine\.co\/v\/(\w+)\/embed/, 
-      /^(https?:\/\/|\/\/)(www\.)?instagram\.com\/p\/([\w\-]+)/, 
-      /^(https?:\/\/|\/\/)(www\.)?instagram\.com\/p\/([\w\-]+)\/embed/,
-      /^(https?:\/\/|\/\/)player\.vimeo\.com\/video\/.*/
-    ];
     var match = false;
     for(var i = videosRegex.length - 1; i >=0; --i ){
       if(videosRegex[i].test(url)){
@@ -560,6 +560,22 @@ var readify = function (){
       }
     }
     return match;
+  }
+
+  var getVideoID = function(url){
+    var matches = null;
+    for(var i = videosRegex.length - 1; i >=0; --i ){
+      if(matches = videosRegex[i].exec(url)){
+        return matches[1];
+      }
+    }
+  }
+
+  var getNormalizedUrl = function(url, id){
+    if(url.indexOf("youtu") != -1){
+      return "http://www.youtube.com/embed/" + id;
+    }
+    return url;
   }
 
   var isGoodImage = function(img){
@@ -576,11 +592,11 @@ var readify = function (){
   }
 
   var getOgVideo = function(){
-    var ogVideoMeta = document.querySelector('[property="og:video"]');
-    if(ogVideoMeta && isVideoUrl(ogVideoMeta.getAttribute("content"))){
+    var ogVideoMeta = document.querySelector('[property="og:video"]'), videoID;
+    if(ogVideoMeta && (videoID = getVideoID(ogVideoMeta.getAttribute("content")))){
       var video = document.createElement("iframe");
       video.isVideo = true;
-      video.src = ogVideoMeta.getAttribute("content");
+      video.src = getNormalizedUrl(ogVideoMeta.getAttribute("content"), videoID);
       var width = document.querySelector('[property="og:video:width"]');
       width = width && parseFloat(width.getAttribute("content"));
       var height = document.querySelector('[property="og:height"]');
