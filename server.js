@@ -21,9 +21,9 @@ var configPage = function(page, send, timedOut){
   page.settings.userAgent = "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36";
 
   //disable gzip to overcome parsing bugs
-  page.customHeaders = {
-    "Accept-Encoding": "identity"
-  };
+  // page.customHeaders = {
+  //   "Accept-Encoding": "identity"
+  // };
 
   page.viewportSize = { width: 1920, height: 1080 }
 
@@ -86,7 +86,11 @@ var configPage = function(page, send, timedOut){
 
   page.onError = function (msg, trace) {
     dbg("error catched! " + msg + " trace " + JSON.stringify(trace));
-    page.onCallback({ action: "runReadify"});
+    setTimeout(function(){
+      if(!page.stopping && !timedOut.already){
+        page.onCallback({ action: "runReadify"});
+      }
+    }, 250);
   }
 }
 
