@@ -84,6 +84,16 @@ namespace :deploy do
     end
   end
 
+  desc 'Rewrite hosts file'
+  task :rewrite_hosts_file do
+    on roles(:app) do
+      within release_path do
+        execute "cp", "hosts /etc/hosts"
+      end
+    end
+  end
+
   after :publishing, :restart
+  after :publishing, :rewrite_hosts_file
 
 end
