@@ -88,7 +88,7 @@ namespace :deploy do
   task :rewrite_hosts_file do
     on roles(:app) do
       within release_path do
-        execute "cp", "hosts /etc/hosts"
+        execute "sudo", "cp hosts /etc/hosts"
       end
     end
   end
